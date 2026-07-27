@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-newsreader);
+  --font-mono: var(--font-ibm-plex-mono);
+}
+
+@layer base {
+  :root {
+    /* Vibrant Nature & Data Palette */
+    --color-bg: #f4fdf8;      /* Very light mint/green tint for background */
+    --color-surface: #ffffff; /* Clean white for cards */
+    --color-ink: #0f172a;     /* Slate 900 for sharp text */
+    --color-primary: #10b981; /* Emerald 500 — Vibrant green for main actions */
+    --color-primary-dark: #047857; /* Emerald 700 for hovers */
+    --color-secondary: #3b82f6; /* Blue 500 — For charts and data accents */
+    --color-accent: #f59e0b;  /* Amber 500 — For highlights, sun/climate */
+    --color-alert: #ef4444;   /* Red 500 — For pests, warnings */
+    --color-rule: #e2e8f0;    /* Slate 200 for subtle borders */
+    
+    /* Chart Colors */
+    --color-chart-1: #10b981;
+    --color-chart-2: #3b82f6;
+    --color-chart-3: #8b5cf6;
+    --color-chart-4: #f59e0b;
+  }
+
+  .dark {
+    --color-bg: #0f172a;      /* Slate 900 for dark background */
+    --color-surface: #1e293b; /* Slate 800 for dark cards */
+    --color-ink: #f8fafc;     /* Slate 50 for light text */
+    --color-primary: #10b981; /* Keep emerald */
+    --color-primary-dark: #34d399; /* Lighter emerald for hovers in dark mode */
+    --color-secondary: #3b82f6; 
+    --color-accent: #f59e0b;  
+    --color-alert: #f87171;   /* Red 400 for alerts */
+    --color-rule: #334155;    /* Slate 700 for borders */
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+    /* Subtle background pattern */
+    background-image: radial-gradient(var(--color-primary) 0.5px, transparent 0.5px);
+    background-size: 24px 24px;
+    background-color: var(--color-bg);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

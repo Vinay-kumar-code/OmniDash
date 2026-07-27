@@ -1,36 +1,145 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🌿 AgriDash AI — Smart Agricultural Intelligence Dashboard
 
-## Getting Started
+AgriDash AI is a full-stack, data-driven agricultural decision-support web application. It generates vibrant, data-dense, interactive dashboards for any crop or agricultural topic using real-time web research powered by OpenRouter LLMs.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## ✨ Features
+
+- 🎯 **Real-Time Agricultural Research**: Extracts crop agronomy, market trends, historical yield stats, pesticide management, and government schemes.
+- 📊 **Visual Dashboard Engine**: Dynamically renders color-coded charts, KPIs, climate cards, cultivation timelines, and pest management checklists.
+- 📄 **Document Parsing Support**: Upload reference PDFs (`unpdf`) or Word documents (`mammoth`) to contextualize crop research.
+- 🔒 **Enterprise-Grade API Security**:
+  - Masked API key storage (keys are never exposed to the client).
+  - Server-side SQLite isolation with WAL mode concurrency.
+  - HTML sanitization using `DOMPurify` to prevent XSS.
+- ⚙️ **In-App Settings Management**: Dynamically configure your OpenRouter API key and preferred model (Free or Paid) directly from the UI without restarting the server.
+- 🌓 **Native Light & Dark Mode**: Seamless theme switching synchronized across app pages and embedded dashboard frames.
+
+---
+
+## 🛠 Tech Stack
+
+- **Framework**: [Next.js 15+ (App Router)](https://nextjs.org/)
+- **Language**: [TypeScript](https://www.typescriptlang.org/)
+- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/) & Vanilla CSS Tokens
+- **Database**: [SQLite3 (`better-sqlite3`)](https://github.com/WiseLibs/better-sqlite3)
+- **AI Research**: [OpenRouter API](https://openrouter.ai/) (Compatible with Claude 3.5, Llama 3.3, Gemini 2.0, DeepSeek R1, GPT-4o)
+- **Document Parsing**: `unpdf` (PDF) & `mammoth` (DOCX)
+- **Sanitization**: `isomorphic-dompurify`
+- **Icons**: `lucide-react`
+
+---
+
+## 📁 Repository Structure
+
+```text
+AgriDash/
+├── app/
+│   ├── api/
+│   │   ├── dashboard/generate/  # HTML dashboard generator route
+│   │   ├── research/            # AI web research pipeline
+│   │   ├── settings/            # Secure key & model settings route
+│   │   ├── topics/              # Discovery topic index route
+│   │   └── upload/              # Document parser API
+│   ├── browse/                  # Recent discoveries directory
+│   ├── dashboard/[slug]/        # Rendered dashboard route
+│   ├── globals.css              # Color tokens & theme styles
+│   ├── layout.tsx               # Root layout & providers
+│   └── page.tsx                 # Search & document upload home page
+├── components/
+│   ├── DashboardFrame.tsx       # Theme-aware iframe container
+│   aria/ FileUpload.tsx           # Drag-and-drop document upload
+│   ├── Navbar.tsx               # Header navigation & settings trigger
+│   ├── SearchBox.tsx            # Topic search input & validation
+│   ├── SettingsModal.tsx        # Secure API key & model settings modal
+│   └── ThemeProvider.tsx        # Next-themes context wrapper
+├── lib/
+│   ├── db.ts                    # SQLite connection & migrations
+│   └── settings.ts              # System settings helper
+├── .env.example                 # Environment variables template
+├── .gitignore                   # Security exclusion rules
+└── README.md                    # Documentation
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🚀 Quick Start Guide
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Prerequisites
+- **Node.js**: `v20.16.0` or higher (Recommended: Node 22+)
+- **Package Manager**: `npm` (v10+)
+- **OpenRouter API Key**: Obtain a key from [OpenRouter Keys](https://openrouter.ai/settings/keys).
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+### Step 1: Clone Repository
+```bash
+git clone https://github.com/YOUR_USERNAME/AgriDash.git
+cd AgriDash
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Step 2: Install Dependencies
+```bash
+npm install
+```
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Step 3: Configure Environment Variables
+Copy `.env.example` to `.env.local`:
+```bash
+cp .env.example .env.local
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Edit `.env.local`:
+```env
+OPENROUTER_API_KEY=sk-or-v1-YOUR_ACTUAL_OPENROUTER_KEY
+OPENROUTER_MODEL=meta-llama/llama-3.3-70b-instruct:free
+```
+
+*Note: You can also update the API Key and Model directly from the web interface via the **Settings** modal at any time.*
+
+---
+
+### Step 4: Run Development Server
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+---
+
+## 🔒 Security Practices
+
+1. **API Key Privacy**:
+   - `OPENROUTER_API_KEY` is stored strictly on the server (in SQLite or `.env.local`).
+   - The `/api/settings` GET endpoint returns only masked strings (e.g. `sk-or-v1-••••••••42b1`).
+   - Raw keys are never transmitted to client JavaScript bundles.
+2. **Git Exclusion**:
+   - `.gitignore` explicitly prevents committing `.env.local`, SQLite databases (`agridash.db`), and log files to Git repositories.
+3. **Cross-Site Scripting (XSS) Prevention**:
+   - Dashboard HTML fragments generated by AI are sanitized with `DOMPurify` before database insertion.
+
+---
+
+## 📦 Production Deployment
+
+To build and run AgriDash in a production environment:
+
+```bash
+# 1. Type check & build production bundle
+npm run build
+
+# 2. Start production server
+npm run start
+```
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
