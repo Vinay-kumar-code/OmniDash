@@ -41,7 +41,7 @@ export default function DashboardFrame({ html }: { html: string }) {
           srcDoc={wrappedHtml}
           sandbox="allow-same-origin"
           className="w-full min-h-[1200px] border-none bg-transparent"
-          title="AgriDash Dashboard"
+          title="OmniDash Intelligence Dashboard"
         />
       )}
     </div>

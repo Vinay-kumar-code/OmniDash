@@ -1,65 +1,74 @@
-# 🌿 AgriDash AI — Smart Agricultural Intelligence Dashboard
+# 🔮 OmniDash AI — Universal Visual Intelligence & Knowledge Dashboard
 
-AgriDash AI is a full-stack, data-driven agricultural decision-support web application. It generates vibrant, data-dense, interactive dashboards for any crop or agricultural topic using real-time web research powered by OpenRouter LLMs.
+**OmniDash AI** is a full-stack, data-driven visual intelligence platform that instantly researches and generates rich, interactive dashboards for **any topic**—spanning Science, Technology, Agriculture, History, Finance, Medicine, and Engineering.
+
+Built with Next.js 15 (App Router), TypeScript, Tailwind CSS, SQLite, and OpenRouter LLMs, it features a **zero-failure deterministic visual engine** that guarantees beautifully styled charts and KPIs across any AI model.
 
 ---
 
-## ✨ Features
+## ✨ Key Features
 
-- 🎯 **Real-Time Agricultural Research**: Extracts crop agronomy, market trends, historical yield stats, pesticide management, and government schemes.
-- 📊 **Visual Dashboard Engine**: Dynamically renders color-coded charts, KPIs, climate cards, cultivation timelines, and pest management checklists.
-- 📄 **Document Parsing Support**: Upload reference PDFs (`unpdf`) or Word documents (`mammoth`) to contextualize crop research.
-- 🔒 **Enterprise-Grade API Security**:
-  - Masked API key storage (keys are never exposed to the client).
-  - Server-side SQLite isolation with WAL mode concurrency.
-  - HTML sanitization using `DOMPurify` to prevent XSS.
-- ⚙️ **In-App Settings Management**: Dynamically configure your OpenRouter API key and preferred model (Free or Paid) directly from the UI without restarting the server.
-- 🌓 **Native Light & Dark Mode**: Seamless theme switching synchronized across app pages and embedded dashboard frames.
+- 🌐 **Universal Knowledge Coverage**: Research and generate structured intelligence on any subject (e.g., Quantum Computing, Tomato Cultivation, CRISPR, Roman Republic, Stock Valuation, Nuclear Fusion).
+- 🛡️ **Zero-Failure Dashboard Engine**:
+  - Implements multi-stage HTML validation, stripping reasoning tags (`<think>...</think>`) and conversational preambles.
+  - Automatically falls back to an integrated, responsive SVG template generator if an AI model outputs malformed HTML or times out. **No more HTML error screens!**
+- 📄 **Multiformat Document Grounding**: Upload reference PDF (`unpdf`) or DOCX (`mammoth`) documents to ground research in personal or proprietary context.
+- 🔒 **Enterprise-Grade API Security & Masking**:
+  - OpenRouter API keys are stored server-side in SQLite and never transmitted to the client.
+  - Settings UI returns masked keys (`sk-or-v1-••••••••42b1`). Updating requires explicitly providing a new key.
+  - AI-generated dashboard HTML is sanitized using `DOMPurify` to eliminate XSS risks.
+- ⚙️ **In-App Dynamic Settings**: Select free models (e.g. `meta-llama/llama-3.3-70b-instruct:free`, `deepseek/deepseek-r1:free`) or premium models (`anthropic/claude-3.5-sonnet`) directly in the app without editing code or restarting the server.
+- 🌓 **Synchronized Light & Dark Mode**: Persistent theme switching synchronized across both the host app and nested dashboard iframe containers.
 
 ---
 
 ## 🛠 Tech Stack
 
-- **Framework**: [Next.js 15+ (App Router)](https://nextjs.org/)
-- **Language**: [TypeScript](https://www.typescriptlang.org/)
-- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/) & Vanilla CSS Tokens
-- **Database**: [SQLite3 (`better-sqlite3`)](https://github.com/WiseLibs/better-sqlite3)
-- **AI Research**: [OpenRouter API](https://openrouter.ai/) (Compatible with Claude 3.5, Llama 3.3, Gemini 2.0, DeepSeek R1, GPT-4o)
-- **Document Parsing**: `unpdf` (PDF) & `mammoth` (DOCX)
-- **Sanitization**: `isomorphic-dompurify`
-- **Icons**: `lucide-react`
+| Layer | Technology |
+|---|---|
+| **Framework** | [Next.js 15+ (App Router)](https://nextjs.org/) |
+| **Language** | [TypeScript](https://www.typescriptlang.org/) |
+| **Styling** | [Tailwind CSS v4](https://tailwindcss.com/) & Custom CSS Variables |
+| **Database** | [SQLite3 (`better-sqlite3`)](https://github.com/WiseLibs/better-sqlite3) with WAL Mode |
+| **AI LLM API** | [OpenRouter API](https://openrouter.ai/) (Compatible with all models) |
+| **Document Parsing** | `unpdf` (PDFs) & `mammoth` (Word DOCX) |
+| **Sanitization** | `isomorphic-dompurify` |
+| **Theme** | `next-themes` |
+| **Icons** | `lucide-react` |
 
 ---
 
-## 📁 Repository Structure
+## 📁 Project Structure
 
 ```text
-AgriDash/
+OmniDash/
 ├── app/
 │   ├── api/
-│   │   ├── dashboard/generate/  # HTML dashboard generator route
-│   │   ├── research/            # AI web research pipeline
-│   │   ├── settings/            # Secure key & model settings route
-│   │   ├── topics/              # Discovery topic index route
-│   │   └── upload/              # Document parser API
-│   ├── browse/                  # Recent discoveries directory
+│   │   ├── dashboard/generate/  # Resilient HTML generator route
+│   │   ├── research/            # Universal topic intelligence pipeline
+│   │   ├── settings/            # Masked API key & model settings route
+│   │   ├── topics/              # Discoveries index route
+│   │   └── upload/              # Document parser API (PDF / DOCX)
+│   ├── browse/                  # Topic directory & historical discoveries
 │   ├── dashboard/[slug]/        # Rendered dashboard route
-│   ├── globals.css              # Color tokens & theme styles
+│   ├── globals.css              # Design system tokens & dark mode
 │   ├── layout.tsx               # Root layout & providers
-│   └── page.tsx                 # Search & document upload home page
+│   └── page.tsx                 # Universal search & category pills
 ├── components/
-│   ├── DashboardFrame.tsx       # Theme-aware iframe container
-│   aria/ FileUpload.tsx           # Drag-and-drop document upload
-│   ├── Navbar.tsx               # Header navigation & settings trigger
-│   ├── SearchBox.tsx            # Topic search input & validation
-│   ├── SettingsModal.tsx        # Secure API key & model settings modal
-│   └── ThemeProvider.tsx        # Next-themes context wrapper
+│   ├── DashboardFrame.tsx       # Theme-synchronized iframe container
+│   ├── FileUpload.tsx           # Context document upload component
+│   ├── Navbar.tsx               # Header branding, browse, & settings
+│   ├── SearchBox.tsx            # Universal topic search input
+│   ├── SettingsModal.tsx        # Masked API key & model settings modal
+│   └── ThemeProvider.tsx        # Theme context provider
 ├── lib/
-│   ├── db.ts                    # SQLite connection & migrations
-│   └── settings.ts              # System settings helper
-├── .env.example                 # Environment variables template
-├── .gitignore                   # Security exclusion rules
-└── README.md                    # Documentation
+│   ├── dashboardTemplate.ts     # Deterministic visual dashboard engine
+│   ├── db.ts                    # SQLite database & auto-migration
+│   └── settings.ts              # SQLite settings persistence
+├── .env.example                 # Environment blueprint
+├── .gitignore                   # Strict security ignore rules
+├── next.config.ts               # Turbopack pinned root configuration
+└── package.json                 # Project dependencies & scripts
 ```
 
 ---
@@ -67,76 +76,101 @@ AgriDash/
 ## 🚀 Quick Start Guide
 
 ### Prerequisites
-- **Node.js**: `v20.16.0` or higher (Recommended: Node 22+)
+- **Node.js**: `v20.16.0` or higher (Node 22 LTS recommended)
 - **Package Manager**: `npm` (v10+)
-- **OpenRouter API Key**: Obtain a key from [OpenRouter Keys](https://openrouter.ai/settings/keys).
+- **OpenRouter API Key**: Obtain a key from [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys).
 
 ---
 
-### Step 1: Clone Repository
+### 1. Installation
 ```bash
-git clone https://github.com/YOUR_USERNAME/AgriDash.git
-cd AgriDash
-```
-
----
-
-### Step 2: Install Dependencies
-```bash
+git clone https://github.com/YOUR_USERNAME/OmniDash.git
+cd OmniDash
 npm install
 ```
 
 ---
 
-### Step 3: Configure Environment Variables
+### 2. Environment Setup
 Copy `.env.example` to `.env.local`:
 ```bash
 cp .env.example .env.local
 ```
 
-Edit `.env.local`:
+Configure `.env.local`:
 ```env
-OPENROUTER_API_KEY=sk-or-v1-YOUR_ACTUAL_OPENROUTER_KEY
+OPENROUTER_API_KEY=sk-or-v1-YOUR_OPENROUTER_KEY
 OPENROUTER_MODEL=meta-llama/llama-3.3-70b-instruct:free
 ```
 
-*Note: You can also update the API Key and Model directly from the web interface via the **Settings** modal at any time.*
+> **Note**: You can also configure your API key and model directly inside the running app via the **Settings** button in the top navigation bar.
 
 ---
 
-### Step 4: Run Development Server
+### 3. Run Development Server
 ```bash
 npm run dev
 ```
+Open **[http://localhost:3000](http://localhost:3000)** in your browser.
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+---
+
+### 4. Production Build
+```bash
+npm run build
+npm run start
+```
+
+---
+
+## 🌿 How to Branch the Previous AgriDash & Push OmniDash to GitHub
+
+If you want to preserve the earlier AgriDash work on a dedicated branch and push this new OmniDash version to `main` (or a brand-new repository), follow these steps:
+
+### Option A: Save Previous Work as a Branch in the Same Repo
+```bash
+# 1. Check current status
+git status
+
+# 2. If you want to create an archive branch of the past commit:
+git branch legacy-agridash
+
+# 3. Add all current OmniDash files to the main branch
+git add .
+
+# 4. Commit OmniDash
+git commit -m "feat: complete rebranding to OmniDash AI with universal knowledge engine and zero-failure dashboard generator"
+
+# 5. Push both branches to GitHub
+git push origin legacy-agridash
+git push origin main
+```
+
+### Option B: Push OmniDash to a Fresh New GitHub Repository
+```bash
+# 1. Create a new empty repository on GitHub named 'OmniDash'
+
+# 2. Stage and commit all files locally
+git add .
+git commit -m "Initial commit: OmniDash AI Universal Intelligence Platform"
+
+# 3. Rename current branch to main
+git branch -M main
+
+# 4. Set the new remote URL (replace with your new repo URL)
+git remote set-url origin https://github.com/YOUR_USERNAME/OmniDash.git
+
+# 5. Push to your new repository
+git push -u origin main
+```
 
 ---
 
 ## 🔒 Security Practices
 
-1. **API Key Privacy**:
-   - `OPENROUTER_API_KEY` is stored strictly on the server (in SQLite or `.env.local`).
-   - The `/api/settings` GET endpoint returns only masked strings (e.g. `sk-or-v1-••••••••42b1`).
-   - Raw keys are never transmitted to client JavaScript bundles.
-2. **Git Exclusion**:
-   - `.gitignore` explicitly prevents committing `.env.local`, SQLite databases (`agridash.db`), and log files to Git repositories.
-3. **Cross-Site Scripting (XSS) Prevention**:
-   - Dashboard HTML fragments generated by AI are sanitized with `DOMPurify` before database insertion.
-
----
-
-## 📦 Production Deployment
-
-To build and run AgriDash in a production environment:
-
-```bash
-# 1. Type check & build production bundle
-npm run build
-
-# 2. Start production server
-npm run start
-```
+1. **API Key Isolation**: The API key is stored only in SQLite (`omnidash.db`) or `.env.local` on your local server. Client browsers only see masked representations.
+2. **Git Safeguards**: `.gitignore` strictly blocks all `.env*` files, SQLite database files (`*.db`, `*.db-wal`, `*.db-shm`), and build outputs from ever being pushed to version control.
+3. **HTML Sanitization**: All incoming HTML is parsed and sanitized by `DOMPurify` before database persistence.
 
 ---
 

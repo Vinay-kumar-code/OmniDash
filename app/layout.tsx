@@ -23,8 +23,8 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AgriDash AI",
-  description: "AI-generated agricultural dashboards based on web research.",
+  title: "OmniDash AI - Universal Visual Intelligence",
+  description: "AI-generated visual intelligence, interactive dashboards, and research on any topic.",
 };
 
 export default function RootLayout({

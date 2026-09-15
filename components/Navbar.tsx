@@ -20,7 +20,7 @@ export default function Navbar() {
               <Atom className="w-5 h-5" />
             </div>
             <span className="font-sans font-black text-xl text-[var(--color-ink)] tracking-tight">
-              AgriDash <span className="text-[var(--color-primary)]">&amp; OmniDash</span>
+              OmniDash <span className="text-[var(--color-primary)]">AI</span>
             </span>
           </Link>
 

@@ -45,7 +45,7 @@ export default function Home() {
 
           <h1 className="font-sans font-black text-4xl sm:text-6xl text-[var(--color-ink)] tracking-tight flex items-center justify-center gap-3">
             <Atom className="w-10 h-10 sm:w-12 sm:h-12 text-[var(--color-primary)]" />
-            AgriDash <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--color-primary)] via-[var(--color-secondary)] to-[var(--color-accent)]">&amp; OmniDash</span>
+            OmniDash <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--color-primary)] via-[var(--color-secondary)] to-[var(--color-accent)]">AI</span>
           </h1>
 
           <p className="font-sans text-lg sm:text-xl text-[var(--color-ink)]/75 max-w-2xl mx-auto text-balance">

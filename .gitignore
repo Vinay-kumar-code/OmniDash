@@ -27,6 +27,7 @@
 *.db-wal
 *.db-shm
 agridash.db
+omnidash.db
 
 # Environment variables (NEVER commit secrets to Git)
 .env
