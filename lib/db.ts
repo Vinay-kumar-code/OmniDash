@@ -2,18 +2,8 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 
-// Define the database paths
-const legacyDbPath = path.join(process.cwd(), 'agridash.db');
+// Define the database path
 const dbPath = path.join(process.cwd(), 'omnidash.db');
-
-// Automatically migrate legacy database file if present
-if (fs.existsSync(legacyDbPath) && !fs.existsSync(dbPath)) {
-  try {
-    fs.copyFileSync(legacyDbPath, dbPath);
-  } catch (err) {
-    console.warn("Could not copy legacy database:", err);
-  }
-}
 
 // Initialize the database connection
 const db = new Database(dbPath, { verbose: console.log });
