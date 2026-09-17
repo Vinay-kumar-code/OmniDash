@@ -29,7 +29,13 @@ export default function FileUpload({ onUploadComplete }: { onUploadComplete: (id
         method: "POST",
         body: formData,
       });
-      const data = await res.json();
+      const text = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { error: `Upload error (${res.status})` };
+      }
 
       if (res.ok) {
         setStatus("success");

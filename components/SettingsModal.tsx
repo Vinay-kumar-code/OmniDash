@@ -85,7 +85,13 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         }),
       });
 
-      const data = await res.json();
+      const resText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(resText);
+      } catch {
+        data = { error: `Server error (${res.status})` };
+      }
 
       if (res.ok) {
         setIsApiKeySet(data.isApiKeySet);

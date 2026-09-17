@@ -5,16 +5,189 @@ import DOMPurify from "isomorphic-dompurify";
 import { getOpenRouterConfig } from "@/lib/settings";
 import { generateDeterministicDashboard } from "@/lib/dashboardTemplate";
 
+export const maxDuration = 120;
+export const dynamic = "force-dynamic";
+
+/**
+ * Intelligent topic theme token generator based on semantic keywords and category.
+ * Guaranteed 0ms latency with vibrant, topic-tailored color harmonies.
+ */
+function getSemanticThemeTokens(topicName: string, category: string): string {
+  const text = `${topicName} ${category}`.toLowerCase();
+  let primary = "#10b981";
+  let primaryDark = "#047857";
+  let secondary = "#3b82f6";
+  let accent = "#f59e0b";
+
+  if (/festival|chaviti|ganesh|religion|hindu|culture|god|temple|tradition/i.test(text)) {
+    primary = "#ea580c"; // Vibrant saffron
+    primaryDark = "#c2410c";
+    secondary = "#eab308"; // Golden yellow
+    accent = "#d97706";
+  } else if (/tech|computer|software|quantum|ai|robot|code|algorithm|cyber/i.test(text)) {
+    primary = "#7c3aed"; // Violet
+    primaryDark = "#6d28d9";
+    secondary = "#06b6d4"; // Cyan
+    accent = "#f43f5e";
+  } else if (/science|physics|fusion|energy|astronomy|space|chemical/i.test(text)) {
+    primary = "#0284c7"; // Sky blue
+    primaryDark = "#0369a1";
+    secondary = "#6366f1"; // Indigo
+    accent = "#f59e0b";
+  } else if (/finance|money|stock|market|valuation|invest|crypto|bank/i.test(text)) {
+    primary = "#1d4ed8"; // Royal blue
+    primaryDark = "#1e40af";
+    secondary = "#059669"; // Emerald
+    accent = "#d97706";
+  } else if (/health|medic|crispr|bio|gene|disease|pharma|doctor/i.test(text)) {
+    primary = "#0d9488"; // Teal
+    primaryDark = "#0f766e";
+    secondary = "#f43f5e"; // Rose
+    accent = "#3b82f6";
+  } else if (/history|empire|war|republic|ancient|rome|revolution/i.test(text)) {
+    primary = "#9a3412"; // Terracotta
+    primaryDark = "#7c2d12";
+    secondary = "#b45309"; // Amber
+    accent = "#dc2626";
+  }
+
+  return `
+:root {
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-ink: #0f172a;
+  --color-primary: ${primary};
+  --color-primary-dark: ${primaryDark};
+  --color-secondary: ${secondary};
+  --color-accent: ${accent};
+  --color-alert: #ef4444;
+  --color-rule: #e2e8f0;
+  --color-chart-1: ${primary};
+  --color-chart-2: ${secondary};
+  --color-chart-3: #8b5cf6;
+  --color-chart-4: ${accent};
+}
+.dark {
+  --color-bg: #0b0f19;
+  --color-surface: #1e293b;
+  --color-ink: #f8fafc;
+  --color-primary: ${primary};
+  --color-primary-dark: ${primaryDark};
+  --color-secondary: ${secondary};
+  --color-accent: ${accent};
+  --color-alert: #f87171;
+  --color-rule: #334155;
+}
+`;
+}
+
+/**
+ * Fast visual styling agent: Generates custom theme tokens with a strict 4s timeout.
+ * Falls back immediately to semantic tokens to guarantee zero-delay dashboard building.
+ */
+async function generateTopicThemeTokens(
+  topicName: string,
+  category: string,
+  apiKey: string,
+  model: string
+): Promise<string> {
+  const fallbackTokens = getSemanticThemeTokens(topicName, category);
+  if (!apiKey) return fallbackTokens;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000);
+
+  try {
+    const openai = new OpenAI({
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: apiKey,
+      timeout: 4000,
+      maxRetries: 0,
+    });
+
+    const systemPrompt = `You are a theme palette expert.
+Generate CSS color hexes for the topic and category.
+Return ONLY valid JSON:
+{
+  "primary": "#hex",
+  "primary_dark": "#hex",
+  "secondary": "#hex",
+  "accent": "#hex"
+}`;
+
+    const completion = await openai.chat.completions.create(
+      {
+        model: model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Topic: "${topicName}", Category: "${category}"` },
+        ],
+        temperature: 0.3,
+      },
+      { signal: controller.signal }
+    );
+    clearTimeout(timer);
+
+    const content = completion.choices[0]?.message?.content || "";
+    const clean = content.replace(/```(?:json)?/gi, "").replace(/```/g, "").trim();
+    const firstBrace = clean.indexOf("{");
+    const lastBrace = clean.lastIndexOf("}");
+    if (firstBrace === -1 || lastBrace === -1) return fallbackTokens;
+
+    const parsed = JSON.parse(clean.substring(firstBrace, lastBrace + 1));
+    if (!parsed.primary) return fallbackTokens;
+
+    return `
+:root {
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-ink: #0f172a;
+  --color-primary: ${parsed.primary};
+  --color-primary-dark: ${parsed.primary_dark || parsed.primary};
+  --color-secondary: ${parsed.secondary || "#3b82f6"};
+  --color-accent: ${parsed.accent || "#f59e0b"};
+  --color-alert: #ef4444;
+  --color-rule: #e2e8f0;
+  --color-chart-1: ${parsed.primary};
+  --color-chart-2: ${parsed.secondary || "#3b82f6"};
+  --color-chart-3: #8b5cf6;
+  --color-chart-4: ${parsed.accent || "#f59e0b"};
+}
+.dark {
+  --color-bg: #0b0f19;
+  --color-surface: #1e293b;
+  --color-ink: #f8fafc;
+  --color-primary: ${parsed.primary};
+  --color-primary-dark: ${parsed.primary_dark || parsed.primary};
+  --color-secondary: ${parsed.secondary || "#60a5fa"};
+  --color-accent: ${parsed.accent || "#fbbf24"};
+  --color-alert: #f87171;
+  --color-rule: #334155;
+}
+`;
+  } catch (err) {
+    clearTimeout(timer);
+    return fallbackTokens;
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { researchId, topicId } = await req.json(); // topicId is slug
-    if (!researchId || !topicId) return NextResponse.json({ error: "Missing IDs" }, { status: 400 });
+    const body = await req.json().catch(() => ({}));
+    const { researchId, topicId } = body; // topicId is slug
+    if (!researchId || !topicId) {
+      return NextResponse.json({ error: "Missing researchId or topicId" }, { status: 400 });
+    }
 
     const researchRow = db.prepare("SELECT * FROM research_data WHERE id = ?").get(researchId) as any;
-    if (!researchRow) return NextResponse.json({ error: "Research not found" }, { status: 404 });
+    if (!researchRow) {
+      return NextResponse.json({ error: "Research record not found" }, { status: 404 });
+    }
 
     const topicRow = db.prepare("SELECT * FROM topics WHERE slug = ?").get(topicId) as any;
-    if (!topicRow) return NextResponse.json({ error: "Topic not found" }, { status: 404 });
+    if (!topicRow) {
+      return NextResponse.json({ error: "Topic not found" }, { status: 404 });
+    }
 
     let parsedResearch: any = {};
     try {
@@ -23,103 +196,21 @@ export async function POST(req: NextRequest) {
       parsedResearch = { topic_name: topicRow.display_name };
     }
 
-    const designSystemTokens = `
-:root {
-  --color-bg: #f4fdf8;
-  --color-surface: #ffffff;
-  --color-ink: #0f172a;
-  --color-primary: #10b981;
-  --color-primary-dark: #047857;
-  --color-secondary: #3b82f6;
-  --color-accent: #f59e0b;
-  --color-alert: #ef4444;
-  --color-rule: #e2e8f0;
-  --color-chart-1: #10b981;
-  --color-chart-2: #3b82f6;
-  --color-chart-3: #8b5cf6;
-  --color-chart-4: #f59e0b;
-}
-.dark {
-  --color-bg: #0f172a;
-  --color-surface: #1e293b;
-  --color-ink: #f8fafc;
-  --color-primary: #10b981;
-  --color-primary-dark: #34d399;
-  --color-secondary: #3b82f6;
-  --color-accent: #f59e0b;
-  --color-alert: #f87171;
-  --color-rule: #334155;
-}
-`;
-
-    const systemPrompt = `You are an elite UI designer. Generate ONE self-contained, responsive HTML fragment with inline <style> (no <script>, no external resources) presenting this research JSON as a modern, data-dense, colorful intelligence dashboard.
-
-Follow this design system exactly:
-- CSS variables: ${designSystemTokens}
-- Fonts: var(--font-archivo) for titles, var(--font-newsreader) for reading, var(--font-ibm-plex-mono) for stats (Already loaded).
-- Structure into high-impact visual components:
-  1. Hero masthead with category badges & difficulty indicator.
-  2. KPI row with large colorful numbers, badges, and inline SVG charts (bar charts or line graphs).
-  3. Core concepts cards with takeaways.
-  4. Chronological stepper or timeline process.
-  5. Comparative cards (Best case vs Worst case, advantages vs bottlenecks).
-  6. Practical guide / Solutions / Remedies table or grid.
-  7. Time allocation & resource metrics.
-  8. Clickable reference sources at the footer.
-- Visual Polish: soft rounded corners (16px-24px), subtle box-shadows, rich background gradients, high contrast text for both light and dark modes.
-- Output ONLY the raw HTML fragment. Do not output markdown fences or conversational preambles.`;
-
     const { apiKey, model } = getOpenRouterConfig();
 
-    let rawHtml = "";
+    // Fast theme token synthesis (AI if < 4s, otherwise instant semantic palette)
+    const designTokens = await generateTopicThemeTokens(
+      parsedResearch.topic_name || topicRow.display_name,
+      parsedResearch.category || "General",
+      apiKey,
+      model
+    );
 
-    // Attempt AI Generation if API key is provided
-    if (apiKey) {
-      try {
-        const openai = new OpenAI({
-          baseURL: "https://openrouter.ai/api/v1",
-          apiKey: apiKey,
-        });
-
-        const completion = await openai.chat.completions.create({
-          model: model,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: `Data: ${researchRow.research_json}` },
-          ],
-        });
-
-        rawHtml = completion.choices[0]?.message?.content || "";
-      } catch (aiError) {
-        console.warn("AI dashboard generation call failed. Will fall back to deterministic engine:", aiError);
-        rawHtml = "";
-      }
-    }
-
-    // Clean up response: strip reasoning tokens (<think>...</think>)
-    let cleanedHtml = rawHtml.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
-
-    // Extract HTML if wrapped in code blocks
-    const codeBlockMatch = cleanedHtml.match(/```(?:html)?\s*([\s\S]*?)\s*```/i);
-    if (codeBlockMatch && codeBlockMatch[1]) {
-      cleanedHtml = codeBlockMatch[1].trim();
-    }
-
-    // Strict validation: Does it have legitimate HTML markup and reasonable size?
-    const hasValidMarkup =
-      cleanedHtml.length > 300 &&
-      (cleanedHtml.includes("<div") || cleanedHtml.includes("<section") || cleanedHtml.includes("<style"));
-
-    let finalHtml = "";
-    if (hasValidMarkup) {
-      finalHtml = cleanedHtml;
-    } else {
-      console.log("Model HTML output was malformed or incomplete. Using deterministic dashboard template.");
-      finalHtml = generateDeterministicDashboard(parsedResearch, designSystemTokens);
-    }
+    // Build the visual dashboard immediately
+    const rawHtml = generateDeterministicDashboard(parsedResearch, designTokens);
 
     // Sanitize with DOMPurify
-    const cleanHtml = DOMPurify.sanitize(finalHtml, {
+    const cleanHtml = DOMPurify.sanitize(rawHtml, {
       FORCE_BODY: true,
       ADD_TAGS: ["style", "svg", "path", "rect", "circle", "text", "line", "g", "polygon", "polyline"],
       ADD_ATTR: [
@@ -149,17 +240,35 @@ Follow this design system exactly:
       ],
     });
 
-    // Save to Database
-    const insertDashboard = db.prepare(`
-      INSERT INTO dashboards (topic_id, research_id, html_content) 
-      VALUES (?, ?, ?)
-    `);
-    insertDashboard.run(topicRow.id, researchId, cleanHtml);
+    // Check if dashboard already exists for this research_id
+    const existing = db.prepare("SELECT id FROM dashboards WHERE research_id = ?").get(researchRow.id) as any;
 
-    return NextResponse.json({ success: true, slug: topicId });
+    let dashboardId: number;
+    if (existing) {
+      db.prepare("UPDATE dashboards SET html_content = ?, version = version + 1 WHERE id = ?").run(
+        cleanHtml,
+        existing.id
+      );
+      dashboardId = existing.id;
+    } else {
+      const insertDash = db.prepare(`
+        INSERT INTO dashboards (topic_id, research_id, html_content) 
+        VALUES (?, ?, ?)
+      `);
+      const info = insertDash.run(topicRow.id, researchRow.id, cleanHtml);
+      dashboardId = info.lastInsertRowid as number;
+    }
+
+    return NextResponse.json({
+      success: true,
+      dashboardId,
+      slug: topicRow.slug,
+    });
   } catch (error: any) {
-    console.error("Dashboard generation error:", error);
-    const msg = error?.error?.message || error?.message || "Failed to generate dashboard";
-    return NextResponse.json({ error: `Dashboard generation failed: ${msg}` }, { status: 500 });
+    console.error("[Dashboard Generate API Error]:", error);
+    return NextResponse.json(
+      { error: error?.message || "An unexpected error occurred during dashboard building." },
+      { status: 500 }
+    );
   }
 }
