@@ -24,11 +24,26 @@ function getSemanticThemeTokens(topicName: string, category: string): string {
     primaryDark = "#c2410c";
     secondary = "#eab308"; // Golden yellow
     accent = "#d97706";
-  } else if (/tech|computer|software|quantum|ai|robot|code|algorithm|cyber/i.test(text)) {
+  } else if (/game|gaming|video game|rockstar|playstation|xbox|esport|entertainment/i.test(text)) {
+    primary = "#e11d48"; // Vibrant Rose/Crimson
+    primaryDark = "#be123c";
+    secondary = "#8b5cf6"; // Purple
+    accent = "#06b6d4"; // Cyan
+  } else if (/vitamin|nutrient|nutrition|dietary|mineral|health|medic|bio|pharma/i.test(text)) {
+    primary = "#059669"; // Emerald
+    primaryDark = "#047857";
+    secondary = "#0284c7"; // Sky blue
+    accent = "#ea580c"; // Citrus orange
+  } else if (/quantum|qubit/i.test(text)) {
     primary = "#7c3aed"; // Violet
     primaryDark = "#6d28d9";
     secondary = "#06b6d4"; // Cyan
     accent = "#f43f5e";
+  } else if (/\b(tech|software|computing|algorithm|cyber|cloud|developer)\b/i.test(text) || /\bai\b/i.test(text)) {
+    primary = "#2563eb"; // Blue
+    primaryDark = "#1d4ed8";
+    secondary = "#0d9488"; // Teal
+    accent = "#8b5cf6"; // Violet
   } else if (/science|physics|fusion|energy|astronomy|space|chemical/i.test(text)) {
     primary = "#0284c7"; // Sky blue
     primaryDark = "#0369a1";
@@ -39,11 +54,6 @@ function getSemanticThemeTokens(topicName: string, category: string): string {
     primaryDark = "#1e40af";
     secondary = "#059669"; // Emerald
     accent = "#d97706";
-  } else if (/health|medic|crispr|bio|gene|disease|pharma|doctor/i.test(text)) {
-    primary = "#0d9488"; // Teal
-    primaryDark = "#0f766e";
-    secondary = "#f43f5e"; // Rose
-    accent = "#3b82f6";
   } else if (/history|empire|war|republic|ancient|rome|revolution/i.test(text)) {
     primary = "#9a3412"; // Terracotta
     primaryDark = "#7c2d12";

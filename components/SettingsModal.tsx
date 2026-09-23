@@ -10,10 +10,10 @@ interface SettingsModalProps {
 }
 
 const PRESET_MODELS = [
-  { label: "Llama 3.3 70B (Free)", value: "meta-llama/llama-3.3-70b-instruct:free" },
-  { label: "Gemini 2.0 Flash Lite (Free)", value: "google/gemini-2.0-flash-lite-preview-02-05:free" },
-  { label: "DeepSeek R1 (Free)", value: "deepseek/deepseek-r1:free" },
-  { label: "Qwen 2.5 Coder 32B (Free)", value: "qwen/qwen-2.5-coder-32b-instruct:free" },
+  { label: "Unbiased Pareto (200B+ Model - Recommended)", value: "unbiased/pareto" },
+  { label: "DeepSeek V3 / Chat (Fast & Accurate)", value: "deepseek/deepseek-chat" },
+  { label: "OpenRouter Auto Router", value: "openrouter/auto" },
+  { label: "Llama 3.3 70B Instruct", value: "meta-llama/llama-3.3-70b-instruct" },
   { label: "Claude 3.5 Sonnet (Paid)", value: "anthropic/claude-3.5-sonnet" },
   { label: "GPT-4o Mini (Paid)", value: "openai/gpt-4o-mini" },
 ];
@@ -24,7 +24,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [apiKeyMasked, setApiKeyMasked] = useState("");
   const [isApiKeySet, setIsApiKeySet] = useState(false);
   const [newApiKey, setNewApiKey] = useState("");
-  const [model, setModel] = useState("meta-llama/llama-3.3-70b-instruct:free");
+  const [model, setModel] = useState("unbiased/pareto");
   const [customModel, setCustomModel] = useState("");
   const [isCustom, setIsCustom] = useState(false);
   const [loading, setLoading] = useState(false);
