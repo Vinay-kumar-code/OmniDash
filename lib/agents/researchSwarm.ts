@@ -103,12 +103,19 @@ async function callOpenAiAgent(
   requestedModel: string,
   systemPrompt: string,
   userPrompt: string,
-  timeoutMs = 45000
+  timeoutMs = 45000,
+  customFallbackModels?: string[]
 ): Promise<string> {
   const primary = resolveModelName(requestedModel);
+  const fallbacks = (
+    customFallbackModels && customFallbackModels.length > 0
+      ? customFallbackModels
+      : FALLBACK_MODELS
+  ).map((m) => resolveModelName(m));
+
   const candidateModels = [
     primary,
-    ...FALLBACK_MODELS.filter((m) => m !== primary),
+    ...fallbacks.filter((m) => m !== primary),
   ];
 
   let lastError: any = null;
@@ -167,7 +174,8 @@ export async function runFoundationsAgent(
   contextText: string,
   openai: OpenAI,
   model: string,
-  webResult?: WebResearchResult
+  webResult?: WebResearchResult,
+  fallbackModels?: string[]
 ): Promise<FoundationsData> {
   const systemPrompt = `You are Agent 1 (Foundations & Core Intelligence).
 Analyze the topic using the provided live web research context.
@@ -187,7 +195,7 @@ Return ONLY a valid JSON object matching this schema:
 Ground all facts in reality. No generic placeholders. No markdown outside JSON.`;
 
   const userPrompt = `Topic: "${topic}"\n\nVerified Grounding Information:\n${contextText.slice(0, 5000)}`;
-  const raw = await callOpenAiAgent(openai, model, systemPrompt, userPrompt, 45000);
+  const raw = await callOpenAiAgent(openai, model, systemPrompt, userPrompt, 45000, fallbackModels);
   const parsed = extractCleanJson(raw);
 
   if (!parsed || !parsed.overview) {
@@ -216,7 +224,8 @@ export async function runExecutionAgent(
   contextText: string,
   openai: OpenAI,
   model: string,
-  webResult?: WebResearchResult
+  webResult?: WebResearchResult,
+  fallbackModels?: string[]
 ): Promise<ExecutionData> {
   const systemPrompt = `You are Agent 2 (Lifecycle, Chronology & Tactical Solutions).
 Analyze the topic using the provided live web research context.
@@ -233,7 +242,7 @@ Return ONLY a valid JSON object matching this schema:
 Provide 4-6 real sequential stages or milestones and 3-5 practical remedies/solutions tailored specifically to the topic. Ground all facts in reality. No markdown outside JSON.`;
 
   const userPrompt = `Topic: "${topic}"\n\nVerified Grounding Information:\n${contextText.slice(0, 5000)}`;
-  const raw = await callOpenAiAgent(openai, model, systemPrompt, userPrompt, 45000);
+  const raw = await callOpenAiAgent(openai, model, systemPrompt, userPrompt, 45000, fallbackModels);
   const parsed = extractCleanJson(raw);
 
   if (!parsed || (!Array.isArray(parsed.timeline_or_process) && !Array.isArray(parsed.practical_guide_or_solutions))) {
@@ -259,7 +268,8 @@ export async function runStrategyAgent(
   contextText: string,
   openai: OpenAI,
   model: string,
-  webResult?: WebResearchResult
+  webResult?: WebResearchResult,
+  fallbackModels?: string[]
 ): Promise<StrategyData> {
   const systemPrompt = `You are Agent 3 (Strategic Impact, Trade-offs & Outlook).
 Analyze the topic using the provided live web research context.
@@ -285,7 +295,7 @@ Return ONLY a valid JSON object matching this schema:
 Include real web sources provided in the grounding context. Ground all facts in reality. No markdown outside JSON.`;
 
   const userPrompt = `Topic: "${topic}"\n\nVerified Grounding Information:\n${contextText.slice(0, 5000)}`;
-  const raw = await callOpenAiAgent(openai, model, systemPrompt, userPrompt, 45000);
+  const raw = await callOpenAiAgent(openai, model, systemPrompt, userPrompt, 45000, fallbackModels);
   const parsed = extractCleanJson(raw);
 
   if (!parsed || !parsed.comparative_analysis) {
@@ -759,7 +769,7 @@ export function getFallbackStrategy(topic: string, web?: WebResearchResult): Str
 export async function executeResearchSwarm(
   topic: string,
   contextText: string,
-  config: { apiKey: string; model: string }
+  config: { apiKey: string; model: string; fallbackModels?: string[] }
 ): Promise<SwarmResult> {
   const startTime = Date.now();
   const trimmedTopic = topic.trim();
@@ -811,13 +821,17 @@ ${contextText ? `=== USER UPLOADED CONTEXT ===\n${contextText}` : ""}
   });
 
   console.log(
-    `[ResearchSwarm] Step 2: Spawning 3 parallel agents with grounded web intelligence using model: ${config.model}`
+    `[ResearchSwarm] Step 2: Spawning 3 parallel agents with grounded web intelligence using model: ${config.model}${
+      config.fallbackModels && config.fallbackModels.length > 0
+        ? ` (fallbacks: ${config.fallbackModels.join(", ")})`
+        : ""
+    }`
   );
 
   const [agent1Settled, agent2Settled, agent3Settled] = await Promise.allSettled([
-    runFoundationsAgent(trimmedTopic, groundedContext, openai, config.model, webResearch),
-    runExecutionAgent(trimmedTopic, groundedContext, openai, config.model, webResearch),
-    runStrategyAgent(trimmedTopic, groundedContext, openai, config.model, webResearch),
+    runFoundationsAgent(trimmedTopic, groundedContext, openai, config.model, webResearch, config.fallbackModels),
+    runExecutionAgent(trimmedTopic, groundedContext, openai, config.model, webResearch, config.fallbackModels),
+    runStrategyAgent(trimmedTopic, groundedContext, openai, config.model, webResearch, config.fallbackModels),
   ]);
 
   const agent1Success = agent1Settled.status === "fulfilled";

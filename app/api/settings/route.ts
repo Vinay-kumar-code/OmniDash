@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOpenRouterConfig, setSetting } from "@/lib/settings";
+import { getOpenRouterConfig, setSetting, setFallbackModels } from "@/lib/settings";
 
 export async function GET() {
   try {
-    const { apiKey, model } = getOpenRouterConfig();
+    const { apiKey, model, fallbackModels } = getOpenRouterConfig();
     const isApiKeySet = Boolean(apiKey && apiKey.length > 5);
 
     let apiKeyMasked = "";
@@ -17,6 +17,7 @@ export async function GET() {
       isApiKeySet,
       apiKeyMasked,
       model,
+      fallbackModels,
     });
   } catch (error: any) {
     console.error("GET settings error:", error);
@@ -26,7 +27,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { apiKey, model } = await req.json();
+    const { apiKey, model, fallbackModels } = await req.json();
 
     if (apiKey !== undefined && apiKey !== null) {
       const trimmed = apiKey.trim();
@@ -42,6 +43,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    if (fallbackModels !== undefined && fallbackModels !== null) {
+      setFallbackModels(fallbackModels);
+    }
+
     const updated = getOpenRouterConfig();
     const isApiKeySet = Boolean(updated.apiKey && updated.apiKey.length > 5);
     const apiKeyMasked = isApiKeySet
@@ -53,6 +58,7 @@ export async function POST(req: NextRequest) {
       isApiKeySet,
       apiKeyMasked,
       model: updated.model,
+      fallbackModels: updated.fallbackModels,
     });
   } catch (error: any) {
     console.error("POST settings error:", error);

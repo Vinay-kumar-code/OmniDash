@@ -23,6 +23,47 @@ export function resolveModelName(model?: string | null): string {
   return MODEL_ALIASES[trimmed] || trimmed;
 }
 
+export const DEFAULT_FALLBACK_MODELS = [
+  "unbiased/pareto",
+  "deepseek/deepseek-chat",
+  "openrouter/auto",
+];
+
+export function getFallbackModels(): string[] {
+  const raw = getSetting("openrouter_fallback_models");
+  if (!raw) return [...DEFAULT_FALLBACK_MODELS];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed.map((m) => resolveModelName(String(m))).filter(Boolean);
+    }
+  } catch {
+    const parts = raw
+      .split(/[\n,]+/)
+      .map((s) => resolveModelName(s.trim()))
+      .filter(Boolean);
+    if (parts.length > 0) return parts;
+  }
+  return [...DEFAULT_FALLBACK_MODELS];
+}
+
+export function setFallbackModels(models: string[] | string): void {
+  let modelList: string[] = [];
+  if (Array.isArray(models)) {
+    modelList = models.map((m) => resolveModelName(String(m).trim())).filter(Boolean);
+  } else if (typeof models === "string") {
+    modelList = models
+      .split(/[\n,]+/)
+      .map((s) => resolveModelName(s.trim()))
+      .filter(Boolean);
+  }
+  if (modelList.length === 0) {
+    modelList = [...DEFAULT_FALLBACK_MODELS];
+  }
+  const unique = Array.from(new Set(modelList));
+  setSetting("openrouter_fallback_models", JSON.stringify(unique));
+}
+
 export function getOpenRouterConfig() {
   const dbApiKey = getSetting("openrouter_api_key");
   const dbModel = getSetting("openrouter_model");
@@ -38,5 +79,7 @@ export function getOpenRouterConfig() {
     } catch {}
   }
 
-  return { apiKey, model: resolvedModel };
+  const fallbackModels = getFallbackModels();
+
+  return { apiKey, model: resolvedModel, fallbackModels };
 }

@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const { apiKey, model } = getOpenRouterConfig();
+    const { apiKey, model, fallbackModels } = getOpenRouterConfig();
 
     if (!apiKey) {
       return NextResponse.json(
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Spawn 3 parallel live agents for fast multi-agent research
-    const swarmResult = await executeResearchSwarm(trimmedTopic, fileText, { apiKey, model });
+    const swarmResult = await executeResearchSwarm(trimmedTopic, fileText, { apiKey, model, fallbackModels });
 
     const finalResearchJson = JSON.stringify(swarmResult.data);
 
