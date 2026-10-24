@@ -12,9 +12,6 @@ export function setSetting(key: string, value: string): void {
 // Model alias resolution to handle deprecated or renamed OpenRouter models
 const MODEL_ALIASES: Record<string, string> = {
   "stealth/union-alpha": "unbiased/pareto",
-  "meta-llama/llama-3.3-70b-instruct:free": "unbiased/pareto",
-  "google/gemini-2.0-flash-lite-001": "unbiased/pareto",
-  "google/gemini-2.0-flash-exp:free": "unbiased/pareto",
 };
 
 export function resolveModelName(model?: string | null): string {

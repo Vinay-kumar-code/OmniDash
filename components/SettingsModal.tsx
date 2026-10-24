@@ -13,6 +13,7 @@ const PRESET_MODELS = [
   { label: "Unbiased Pareto (200B+ Model - Recommended)", value: "unbiased/pareto" },
   { label: "DeepSeek V3 / Chat (Fast & Accurate)", value: "deepseek/deepseek-chat" },
   { label: "OpenRouter Auto Router", value: "openrouter/auto" },
+  { label: "Llama 3.3 70B Instruct (Free)", value: "meta-llama/llama-3.3-70b-instruct:free" },
   { label: "Llama 3.3 70B Instruct", value: "meta-llama/llama-3.3-70b-instruct" },
   { label: "Claude 3.5 Sonnet (Paid)", value: "anthropic/claude-3.5-sonnet" },
   { label: "GPT-4o Mini (Paid)", value: "openai/gpt-4o-mini" },
@@ -230,7 +231,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               </label>
               <button
                 type="button"
-                onClick={() => setFallbackText("unbiased/pareto\ndeepseek/deepseek-chat\nopenrouter/auto")}
+                onClick={() => setFallbackText("unbiased/pareto\ndeepseek/deepseek-chat\nopenrouter/auto\nmeta-llama/llama-3.3-70b-instruct:free")}
                 className="text-xs text-[var(--color-primary)] hover:underline flex items-center gap-1 font-medium"
               >
                 <RotateCcw className="w-3 h-3" />
@@ -246,7 +247,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               rows={3}
               value={fallbackText}
               onChange={(e) => setFallbackText(e.target.value)}
-              placeholder="unbiased/pareto&#10;deepseek/deepseek-chat&#10;openrouter/auto"
+              placeholder="unbiased/pareto&#10;deepseek/deepseek-chat&#10;openrouter/auto&#10;meta-llama/llama-3.3-70b-instruct:free"
               className="w-full px-4 py-2.5 text-xs font-mono border border-[var(--color-rule)] rounded-xl bg-[var(--color-bg)] text-[var(--color-ink)] focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-[var(--color-ink)]/30 resize-y"
             />
 
@@ -256,6 +257,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 "unbiased/pareto",
                 "deepseek/deepseek-chat",
                 "openrouter/auto",
+                "meta-llama/llama-3.3-70b-instruct:free",
                 "meta-llama/llama-3.3-70b-instruct",
                 "qwen/qwen-2.5-72b-instruct",
               ].map((m) => {
