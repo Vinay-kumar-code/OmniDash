@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Atom, Settings, Sun, Moon, Compass } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -8,7 +8,12 @@ import SettingsModal from "./SettingsModal";
 
 export default function Navbar() {
   const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <>
@@ -48,10 +53,14 @@ export default function Navbar() {
               className="p-2.5 rounded-full border border-[var(--color-rule)] bg-[var(--color-surface)] text-[var(--color-ink)]/80 hover:bg-[var(--color-rule)]/40 transition-all cursor-pointer"
               aria-label="Toggle Theme"
             >
-              {theme === "dark" ? (
-                <Sun className="w-4 h-4 text-amber-400" />
+              {mounted ? (
+                theme === "dark" ? (
+                  <Sun className="w-4 h-4 text-amber-400" />
+                ) : (
+                  <Moon className="w-4 h-4 text-indigo-600" />
+                )
               ) : (
-                <Moon className="w-4 h-4 text-indigo-600" />
+                <div className="w-4 h-4" />
               )}
             </button>
           </div>

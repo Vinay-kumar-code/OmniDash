@@ -90,6 +90,33 @@ export async function searchWebForTopic(topic: string): Promise<WebResearchResul
   };
 }
 
+function unescapeHtml(str: string): string {
+  if (!str) return "";
+  return str
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&#x2F;/g, "/")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(Number(dec)));
+}
+
+async function fetchWithTimeout(url: string, headers: HeadersInit, timeoutMs = 5000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { headers, signal: controller.signal });
+    clearTimeout(timer);
+    return res;
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
+}
+
 async function fetchWikipediaData(queries: string[]): Promise<{
   title: string;
   extract: string;
@@ -102,9 +129,9 @@ async function fetchWikipediaData(queries: string[]): Promise<{
       const summaryUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(
         q.replace(/\s+/g, "_")
       )}`;
-      const res = await fetch(summaryUrl, {
-        headers: { "User-Agent": "OmniDashAI/1.0 (web-research-agent)" },
-      });
+      const res = await fetchWithTimeout(summaryUrl, {
+        "User-Agent": "OmniDashAI/1.0 (web-research-agent)",
+      }, 5000);
 
       if (res.ok) {
         const data = await res.json();
@@ -115,9 +142,9 @@ async function fetchWikipediaData(queries: string[]): Promise<{
 
         if (!isFilmOrDisambig && data.extract && data.extract.length > 80) {
           return {
-            title: data.title || q,
-            extract: data.extract,
-            description: data.description || "",
+            title: unescapeHtml(data.title || q),
+            extract: unescapeHtml(data.extract),
+            description: unescapeHtml(data.description || ""),
             url: data.content_urls?.desktop?.page || `https://en.wikipedia.org/wiki/${encodeURIComponent(q)}`,
           };
         }
@@ -127,9 +154,9 @@ async function fetchWikipediaData(queries: string[]): Promise<{
       const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
         q
       )}&utf8=&format=json`;
-      const searchRes = await fetch(searchUrl, {
-        headers: { "User-Agent": "OmniDashAI/1.0 (web-research-agent)" },
-      });
+      const searchRes = await fetchWithTimeout(searchUrl, {
+        "User-Agent": "OmniDashAI/1.0 (web-research-agent)",
+      }, 5000);
 
       if (searchRes.ok) {
         const searchData = await searchRes.json();
@@ -140,22 +167,24 @@ async function fetchWikipediaData(queries: string[]): Promise<{
           const hitSumUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(
             hitTitle.replace(/\s+/g, "_")
           )}`;
-          const hitSumRes = await fetch(hitSumUrl, {
-            headers: { "User-Agent": "OmniDashAI/1.0 (web-research-agent)" },
-          });
-          if (hitSumRes.ok) {
-            const hitSumData = await hitSumRes.json();
-            if (hitSumData.extract && hitSumData.extract.length > 80) {
-              return {
-                title: hitSumData.title || hitTitle,
-                extract: hitSumData.extract,
-                description: hitSumData.description || "",
-                url:
-                  hitSumData.content_urls?.desktop?.page ||
-                  `https://en.wikipedia.org/wiki/${encodeURIComponent(hitTitle)}`,
-              };
+          try {
+            const hitSumRes = await fetchWithTimeout(hitSumUrl, {
+              "User-Agent": "OmniDashAI/1.0 (web-research-agent)",
+            }, 5000);
+            if (hitSumRes.ok) {
+              const hitSumData = await hitSumRes.json();
+              if (hitSumData.extract && hitSumData.extract.length > 80) {
+                return {
+                  title: unescapeHtml(hitSumData.title || hitTitle),
+                  extract: unescapeHtml(hitSumData.extract),
+                  description: unescapeHtml(hitSumData.description || ""),
+                  url:
+                    hitSumData.content_urls?.desktop?.page ||
+                    `https://en.wikipedia.org/wiki/${encodeURIComponent(hitTitle)}`,
+                };
+              }
             }
-          }
+          } catch {}
         }
       }
     } catch {
@@ -199,16 +228,21 @@ async function fetchDuckDuckGoSnippets(
 
     let match;
     while ((match = titleRegex.exec(html)) !== null && titles.length < 5) {
-      titles.push(match[2].replace(/<[^>]+>/g, "").trim());
+      titles.push(unescapeHtml(match[2].replace(/<[^>]+>/g, "").trim()));
     }
     while ((match = snippetRegex.exec(html)) !== null && snippets.length < 5) {
-      snippets.push(match[1].replace(/<[^>]+>/g, "").trim());
+      snippets.push(unescapeHtml(match[1].replace(/<[^>]+>/g, "").trim()));
     }
     while ((match = linkRegex.exec(html)) !== null && urls.length < 5) {
       let rawUrl = match[1];
+      if (rawUrl.startsWith("//")) {
+        rawUrl = "https:" + rawUrl;
+      }
       const uddgMatch = rawUrl.match(/uddg=([^&]+)/);
       if (uddgMatch && uddgMatch[1]) {
-        rawUrl = decodeURIComponent(uddgMatch[1]);
+        try {
+          rawUrl = decodeURIComponent(uddgMatch[1]);
+        } catch {}
       }
       urls.push(rawUrl);
     }

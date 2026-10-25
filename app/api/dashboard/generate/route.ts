@@ -255,7 +255,7 @@ export async function POST(req: NextRequest) {
 
     let dashboardId: number;
     if (existing) {
-      db.prepare("UPDATE dashboards SET html_content = ?, version = version + 1 WHERE id = ?").run(
+      db.prepare("UPDATE dashboards SET html_content = ?, version = version + 1, created_at = CURRENT_TIMESTAMP WHERE id = ?").run(
         cleanHtml,
         existing.id
       );

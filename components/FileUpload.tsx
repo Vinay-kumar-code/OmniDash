@@ -64,7 +64,7 @@ export default function FileUpload({ onUploadComplete }: { onUploadComplete: (id
       <div className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center relative transition-all duration-300 ${status === 'success' ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5' : 'border-[var(--color-rule)] bg-[var(--color-bg)] hover:border-[var(--color-secondary)] hover:bg-[var(--color-secondary)]/5'}`}>
         <input
           type="file"
-          accept=".pdf,.docx"
+          accept=".pdf,.docx,.txt,.md,.csv,.json"
           onChange={handleFileChange}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-default"
           disabled={status === "uploading" || status === "success"}
@@ -76,7 +76,7 @@ export default function FileUpload({ onUploadComplete }: { onUploadComplete: (id
               <Upload className="w-6 h-6 text-[var(--color-secondary)]" />
             </div>
             <p className="font-sans text-[var(--color-ink)]/80 text-sm">
-              <span className="font-bold text-[var(--color-secondary)]">Upload a PDF or DOCX</span> to ground the research.
+              <span className="font-bold text-[var(--color-secondary)]">Upload a PDF, DOCX, TXT, or CSV</span> to ground the research.
             </p>
           </div>
         )}

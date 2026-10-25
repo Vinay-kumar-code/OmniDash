@@ -1,6 +1,7 @@
 import db from "@/lib/db";
 import Link from "next/link";
-import { ArrowLeft, Search, ArrowRight, BookOpen } from "lucide-react";
+import { ArrowLeft, Search } from "lucide-react";
+import BrowseExplorer, { TopicItem } from "@/components/BrowseExplorer";
 
 export default async function BrowsePage() {
   const topics = db.prepare(`
@@ -12,9 +13,28 @@ export default async function BrowsePage() {
     ORDER BY last_updated DESC
   `).all() as any[];
 
+  const preparedTopics: TopicItem[] = topics.map((t) => {
+    let category = "General Knowledge";
+    let overview = "";
+    if (t.latest_research) {
+      try {
+        const parsed = JSON.parse(t.latest_research);
+        category = parsed.category || "General Knowledge";
+        overview = parsed.overview || "";
+      } catch {}
+    }
+    return {
+      slug: t.slug,
+      display_name: t.display_name,
+      last_updated: t.last_updated,
+      category,
+      overview,
+    };
+  });
+
   return (
     <main className="min-h-screen bg-[var(--color-bg)] p-4 sm:p-8">
-      <div className="max-w-5xl mx-auto space-y-8">
+      <div className="max-w-6xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--color-rule)] pb-5">
           <div className="flex items-center gap-3">
@@ -29,7 +49,7 @@ export default async function BrowsePage() {
                 Researched Dashboards
               </h1>
               <p className="text-xs sm:text-sm text-[var(--color-ink)]/60">
-                Explore previous visual intelligence reports and learning roadmaps.
+                Explore previous visual intelligence reports, interactive metrics, and execution roadmaps.
               </p>
             </div>
           </div>
@@ -42,76 +62,8 @@ export default async function BrowsePage() {
           </Link>
         </div>
 
-        {topics.length === 0 ? (
-          <div className="text-center py-20 bg-[var(--color-surface)] border border-[var(--color-rule)] rounded-3xl p-8">
-            <BookOpen className="w-12 h-12 text-[var(--color-ink)]/30 mx-auto mb-4" />
-            <p className="font-sans font-bold text-[var(--color-ink)] text-lg mb-2">No dashboards generated yet</p>
-            <p className="text-sm text-[var(--color-ink)]/60 mb-6">
-              Enter any topic on the home page to produce your first interactive dashboard.
-            </p>
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[var(--color-primary)] text-white font-sans text-sm font-bold shadow-md hover:bg-[var(--color-primary-dark)] transition-colors"
-            >
-              Start New Research
-            </Link>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {topics.map((topic, idx) => {
-              let category = "General Knowledge";
-              let overview = "";
-              try {
-                if (topic.latest_research) {
-                  const data = JSON.parse(topic.latest_research);
-                  category = data.category || "General Knowledge";
-                  overview = data.overview ? `${data.overview.slice(0, 110)}...` : "";
-                }
-              } catch {}
-
-              const borderGradients = [
-                "from-[var(--color-primary)] to-[var(--color-secondary)]",
-                "from-[var(--color-secondary)] to-[var(--color-accent)]",
-                "from-[var(--color-accent)] to-[var(--color-alert)]",
-                "from-[var(--color-primary)] to-[var(--color-accent)]",
-              ];
-              const gradient = borderGradients[idx % borderGradients.length];
-
-              return (
-                <Link
-                  key={topic.slug}
-                  href={`/dashboard/${topic.slug}`}
-                  className="group relative block bg-[var(--color-surface)] border border-[var(--color-rule)] p-6 rounded-2xl hover:-translate-y-1.5 transition-all duration-300 hover:shadow-xl hover:shadow-[var(--color-secondary)]/10 overflow-hidden"
-                >
-                  <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${gradient}`}></div>
-                  
-                  <div className="inline-block px-2.5 py-0.5 rounded-full bg-[var(--color-bg)] border border-[var(--color-rule)] text-[10px] font-bold text-[var(--color-primary)] uppercase tracking-wider mb-3">
-                    {category}
-                  </div>
-
-                  <h2 className="font-sans font-bold text-xl text-[var(--color-ink)] capitalize mb-2 group-hover:text-[var(--color-primary)] transition-colors">
-                    {topic.display_name}
-                  </h2>
-
-                  {overview && (
-                    <p className="text-xs text-[var(--color-ink)]/70 mb-4 line-clamp-2">
-                      {overview}
-                    </p>
-                  )}
-
-                  <div className="flex items-center justify-between mt-auto pt-3 border-t border-[var(--color-rule)]/40">
-                    <span className="font-mono text-xs text-[var(--color-ink)]/50">
-                      {new Date(topic.last_updated).toLocaleDateString()}
-                    </span>
-                    <span className="font-sans text-xs font-bold text-[var(--color-primary)] flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                      View Dashboard <ArrowRight className="w-3.5 h-3.5" />
-                    </span>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        )}
+        {/* Interactive Explorer with Search & Filter */}
+        <BrowseExplorer initialTopics={preparedTopics} />
       </div>
     </main>
   );

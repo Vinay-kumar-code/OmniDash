@@ -145,6 +145,15 @@ async function callOpenAiAgent(
     } catch (err: any) {
       clearTimeout(timer);
       lastError = err;
+
+      // If the API key is invalid or has no credits, retrying more models won't help
+      if (err?.status === 401 || err?.status === 402 || err?.status === 403) {
+        console.warn(
+          `[ResearchSwarm] OpenRouter authentication or billing error (HTTP ${err.status}: ${err.message}). Halting cascade.`
+        );
+        break;
+      }
+
       const isDeprecationOrNotFound =
         err?.status === 404 ||
         err?.status === 400 ||

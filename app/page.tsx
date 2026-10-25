@@ -83,7 +83,7 @@ export default function Home() {
           {/* File Upload Context Section */}
           <div className="mt-8 pt-8 border-t border-[var(--color-rule)]/50">
             <div className="text-xs font-bold uppercase tracking-wider text-[var(--color-ink)]/50 mb-3 text-center sm:text-left">
-              Upload Context Document (Optional PDF / DOCX):
+              Upload Context Document (Optional PDF, DOCX, TXT, CSV):
             </div>
             <FileUpload onUploadComplete={(id) => setFileId(id)} />
           </div>

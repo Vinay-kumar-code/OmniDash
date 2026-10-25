@@ -21,20 +21,38 @@ export async function POST(req: NextRequest) {
     let extractedText = "";
     let fileType = "";
 
-    if (type?.mime === "application/pdf" || file.name.endsWith(".pdf")) {
+    const lowerName = file.name.toLowerCase();
+    const isTextFile =
+      lowerName.endsWith(".txt") ||
+      lowerName.endsWith(".md") ||
+      lowerName.endsWith(".csv") ||
+      lowerName.endsWith(".json") ||
+      lowerName.endsWith(".tsv") ||
+      type?.mime === "text/plain" ||
+      type?.mime === "text/markdown" ||
+      type?.mime === "text/csv";
+
+    if (type?.mime === "application/pdf" || lowerName.endsWith(".pdf")) {
       fileType = "pdf";
       const uint8 = new Uint8Array(buffer);
       const { text } = await extractText(uint8);
       extractedText = Array.isArray(text) ? text.join("\n") : (text || "");
     } else if (
       type?.mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-      file.name.endsWith(".docx")
+      lowerName.endsWith(".docx")
     ) {
       fileType = "docx";
       const result = await mammoth.extractRawText({ buffer });
       extractedText = result.value;
+    } else if (isTextFile) {
+      const ext = lowerName.split(".").pop() || "txt";
+      fileType = ext;
+      extractedText = buffer.toString("utf-8");
     } else {
-      return NextResponse.json({ error: "Unsupported file type. Please upload PDF or DOCX." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Unsupported file type. Please upload PDF, DOCX, TXT, MD, or CSV." },
+        { status: 400 }
+      );
     }
 
     // Since we don't have a topic yet, we can store it in uploaded_files with topic_id=0 for now, 

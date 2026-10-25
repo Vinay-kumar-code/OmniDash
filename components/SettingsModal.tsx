@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Key, Cpu, Sun, Moon, Check, ShieldAlert, Sparkles, Layers, RotateCcw } from "lucide-react";
+import { X, Key, Cpu, Sun, Moon, Check, ShieldAlert, Sparkles, Layers, RotateCcw, Activity, Loader2 } from "lucide-react";
 import { useTheme } from "next-themes";
 
 interface SettingsModalProps {
@@ -30,6 +30,8 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [isCustom, setIsCustom] = useState(false);
   const [fallbackText, setFallbackText] = useState("");
   const [loading, setLoading] = useState(false);
+  const [testingKey, setTestingKey] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,6 +66,28 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       }
     } catch (err) {
       console.error("Failed to load settings", err);
+    }
+  };
+
+  const handleTestKey = async () => {
+    setTestingKey(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/settings/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: newApiKey.trim() || undefined }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setTestResult({ success: true, message: data.message });
+      } else {
+        setTestResult({ success: false, message: data.error || "Key validation failed." });
+      }
+    } catch (err: any) {
+      setTestResult({ success: false, message: err?.message || "Connection failed." });
+    } finally {
+      setTestingKey(false);
     }
   };
 
@@ -127,7 +151,12 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   if (!isOpen || !mounted) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+    >
       <div className="relative w-full max-w-xl bg-[var(--color-surface)] border border-[var(--color-rule)] rounded-3xl shadow-2xl overflow-hidden text-[var(--color-ink)]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--color-rule)] bg-[var(--color-bg)]/50">
@@ -161,7 +190,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               </div>
             )}
 
-            <div className="space-y-1">
+            <div className="space-y-2">
               <input
                 type="password"
                 value={newApiKey}
@@ -169,6 +198,26 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 placeholder={isApiKeySet ? "Enter new API key to replace existing..." : "sk-or-v1-..."}
                 className="w-full px-4 py-3 text-sm font-mono border border-[var(--color-rule)] rounded-xl bg-[var(--color-bg)] text-[var(--color-ink)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] placeholder:text-[var(--color-ink)]/30"
               />
+              <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleTestKey}
+                  disabled={testingKey || (!isApiKeySet && !newApiKey.trim())}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--color-primary)]/40 bg-[var(--color-primary)]/10 hover:bg-[var(--color-primary)]/20 text-[var(--color-primary)] text-xs font-semibold transition-all disabled:opacity-40 cursor-pointer"
+                >
+                  {testingKey ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Activity className="w-3.5 h-3.5" />}
+                  {testingKey ? "Testing..." : "Test Connection"}
+                </button>
+                {testResult && (
+                  <span
+                    className={`text-xs font-sans ${
+                      testResult.success ? "text-emerald-500 font-semibold" : "text-red-500 font-medium"
+                    }`}
+                  >
+                    {testResult.message}
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-[var(--color-ink)]/50 flex items-center gap-1 pt-1">
                 <ShieldAlert className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                 For security, your current key is hidden. Leave empty to keep existing key.
