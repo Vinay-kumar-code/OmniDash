@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOpenRouterConfig, setSetting, setFallbackModels } from "@/lib/settings";
+import { getOpenRouterConfig, setSetting, setFallbackModels, setTavilyApiKey } from "@/lib/settings";
 
 export async function GET() {
   try {
-    const { apiKey, model, fallbackModels } = getOpenRouterConfig();
+    const { apiKey, model, fallbackModels, tavilyApiKey } = getOpenRouterConfig();
     const isApiKeySet = Boolean(apiKey && apiKey.length > 5);
 
     let apiKeyMasked = "";
@@ -13,9 +13,19 @@ export async function GET() {
       apiKeyMasked = `${prefix}••••••••${suffix}`;
     }
 
+    const isTavilyKeySet = Boolean(tavilyApiKey && tavilyApiKey.length > 5);
+    let tavilyKeyMasked = "";
+    if (isTavilyKeySet) {
+      const prefix = tavilyApiKey.substring(0, 6);
+      const suffix = tavilyApiKey.slice(-4);
+      tavilyKeyMasked = `${prefix}••••••••${suffix}`;
+    }
+
     return NextResponse.json({
       isApiKeySet,
       apiKeyMasked,
+      isTavilyKeySet,
+      tavilyKeyMasked,
       model,
       fallbackModels,
     });
@@ -27,7 +37,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { apiKey, model, fallbackModels } = await req.json();
+    const { apiKey, model, fallbackModels, tavilyApiKey } = await req.json();
 
     if (apiKey !== undefined && apiKey !== null) {
       const trimmed = apiKey.trim();
@@ -47,16 +57,28 @@ export async function POST(req: NextRequest) {
       setFallbackModels(fallbackModels);
     }
 
+    if (tavilyApiKey !== undefined && tavilyApiKey !== null) {
+      const trimmedTavily = tavilyApiKey.trim();
+      setTavilyApiKey(trimmedTavily);
+    }
+
     const updated = getOpenRouterConfig();
     const isApiKeySet = Boolean(updated.apiKey && updated.apiKey.length > 5);
     const apiKeyMasked = isApiKeySet
       ? `${updated.apiKey.substring(0, 8)}••••••••${updated.apiKey.slice(-4)}`
       : "";
 
+    const isTavilyKeySet = Boolean(updated.tavilyApiKey && updated.tavilyApiKey.length > 5);
+    const tavilyKeyMasked = isTavilyKeySet
+      ? `${updated.tavilyApiKey.substring(0, 6)}••••••••${updated.tavilyApiKey.slice(-4)}`
+      : "";
+
     return NextResponse.json({
       success: true,
       isApiKeySet,
       apiKeyMasked,
+      isTavilyKeySet,
+      tavilyKeyMasked,
       model: updated.model,
       fallbackModels: updated.fallbackModels,
     });

@@ -1,13 +1,62 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOpenRouterConfig } from "@/lib/settings";
+import { getOpenRouterConfig, getTavilyApiKey } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { apiKey: providedKey } = body;
+    const { apiKey: providedKey, tavilyApiKey, type } = body;
 
+    // 1. Tavily API Key Testing
+    if (type === "tavily") {
+      const activeTavilyKey = providedKey?.trim() || tavilyApiKey?.trim() || getTavilyApiKey();
+      if (!activeTavilyKey) {
+        return NextResponse.json(
+          { success: false, error: "No Tavily API key provided to test." },
+          { status: 400 }
+        );
+      }
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 7000);
+
+      try {
+        const res = await fetch("https://api.tavily.com/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            api_key: activeTavilyKey,
+            query: "OmniDash web intelligence test",
+            max_results: 1,
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timer);
+
+        if (res.ok) {
+          return NextResponse.json({
+            success: true,
+            message: "Tavily connection verified! Real-time deep web search is active.",
+          });
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          const errMsg = errData.detail?.error || (res.status === 401 ? "Invalid Tavily API Key." : `Tavily returned HTTP ${res.status}`);
+          return NextResponse.json(
+            { success: false, error: errMsg },
+            { status: 400 }
+          );
+        }
+      } catch (err: any) {
+        clearTimeout(timer);
+        return NextResponse.json(
+          { success: false, error: err?.message || "Failed to reach Tavily API." },
+          { status: 500 }
+        );
+      }
+    }
+
+    // 2. OpenRouter API Key Testing
     const config = getOpenRouterConfig();
     const activeKey = providedKey?.trim() || config.apiKey;
 
@@ -50,7 +99,7 @@ export async function POST(req: NextRequest) {
     }
   } catch (err: any) {
     return NextResponse.json(
-      { success: false, error: err?.message || "Failed to reach OpenRouter." },
+      { success: false, error: err?.message || "Failed to reach server." },
       { status: 500 }
     );
   }

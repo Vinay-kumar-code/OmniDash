@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Key, Cpu, Sun, Moon, Check, ShieldAlert, Sparkles, Layers, RotateCcw, Activity, Loader2 } from "lucide-react";
+import { X, Key, Cpu, Sun, Moon, Check, ShieldAlert, Sparkles, Layers, RotateCcw, Activity, Loader2, Globe, ExternalLink } from "lucide-react";
 import { useTheme } from "next-themes";
 
 interface SettingsModalProps {
@@ -25,6 +25,9 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [apiKeyMasked, setApiKeyMasked] = useState("");
   const [isApiKeySet, setIsApiKeySet] = useState(false);
   const [newApiKey, setNewApiKey] = useState("");
+  const [tavilyKeyMasked, setTavilyKeyMasked] = useState("");
+  const [isTavilyKeySet, setIsTavilyKeySet] = useState(false);
+  const [newTavilyKey, setNewTavilyKey] = useState("");
   const [model, setModel] = useState("unbiased/pareto");
   const [customModel, setCustomModel] = useState("");
   const [isCustom, setIsCustom] = useState(false);
@@ -32,6 +35,8 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [loading, setLoading] = useState(false);
   const [testingKey, setTestingKey] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [testingTavilyKey, setTestingTavilyKey] = useState(false);
+  const [testTavilyResult, setTestTavilyResult] = useState<{ success: boolean; message: string } | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,6 +54,8 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         const data = await res.json();
         setIsApiKeySet(data.isApiKeySet);
         setApiKeyMasked(data.apiKeyMasked);
+        setIsTavilyKeySet(Boolean(data.isTavilyKeySet));
+        setTavilyKeyMasked(data.tavilyKeyMasked || "");
         
         const matchingPreset = PRESET_MODELS.find((m) => m.value === data.model);
         if (matchingPreset) {
@@ -76,7 +83,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       const res = await fetch("/api/settings/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: newApiKey.trim() || undefined }),
+        body: JSON.stringify({ type: "openrouter", apiKey: newApiKey.trim() || undefined }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -88,6 +95,28 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       setTestResult({ success: false, message: err?.message || "Connection failed." });
     } finally {
       setTestingKey(false);
+    }
+  };
+
+  const handleTestTavilyKey = async () => {
+    setTestingTavilyKey(true);
+    setTestTavilyResult(null);
+    try {
+      const res = await fetch("/api/settings/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "tavily", apiKey: newTavilyKey.trim() || undefined }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setTestTavilyResult({ success: true, message: data.message });
+      } else {
+        setTestTavilyResult({ success: false, message: data.error || "Tavily validation failed." });
+      }
+    } catch (err: any) {
+      setTestTavilyResult({ success: false, message: err?.message || "Connection failed." });
+    } finally {
+      setTestingTavilyKey(false);
     }
   };
 
@@ -116,6 +145,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           apiKey: newApiKey.trim() || undefined,
+          tavilyApiKey: newTavilyKey.trim() !== "" ? newTavilyKey.trim() : undefined,
           model: activeModel,
           fallbackModels: parsedFallbacks,
         }),
@@ -132,10 +162,13 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       if (res.ok) {
         setIsApiKeySet(data.isApiKeySet);
         setApiKeyMasked(data.apiKeyMasked);
+        setIsTavilyKeySet(Boolean(data.isTavilyKeySet));
+        setTavilyKeyMasked(data.tavilyKeyMasked || "");
         if (Array.isArray(data.fallbackModels)) {
           setFallbackText(data.fallbackModels.join("\n"));
         }
         setNewApiKey(""); // Clear the input field for security
+        setNewTavilyKey("");
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 3000);
       } else {
@@ -222,6 +255,72 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 <ShieldAlert className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                 For security, your current key is hidden. Leave empty to keep existing key.
               </p>
+            </div>
+          </div>
+
+          <hr className="border-[var(--color-rule)]" />
+
+          {/* Tavily Search API Key Section */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 font-sans font-bold text-sm text-[var(--color-ink)]">
+                <Globe className="w-4 h-4 text-cyan-500" />
+                Tavily Search API Key (Deep Web Grounding)
+              </label>
+              <a
+                href="https://tavily.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-[var(--color-primary)] hover:underline flex items-center gap-1 font-medium"
+              >
+                <span>Get API Key</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+
+            <p className="text-xs text-[var(--color-ink)]/60 leading-relaxed">
+              Tavily powers authoritative, real-time web research across encyclopedias, journals, and news for any topic. Highly recommended to eliminate generic outputs.
+            </p>
+
+            {isTavilyKeySet ? (
+              <div className="flex items-center justify-between p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-xs font-mono">
+                <span className="text-[var(--color-ink)]/70">Active Tavily Key:</span>
+                <span className="font-bold text-cyan-600 dark:text-cyan-400 tracking-wider">{tavilyKeyMasked}</span>
+              </div>
+            ) : (
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-600 dark:text-amber-400 font-sans">
+                No Tavily key set. Falling back to Wikipedia &amp; DuckDuckGo search.
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <input
+                type="password"
+                value={newTavilyKey}
+                onChange={(e) => setNewTavilyKey(e.target.value)}
+                placeholder={isTavilyKeySet ? "Enter new key to replace existing..." : "tvly-..."}
+                className="w-full px-4 py-3 text-sm font-mono border border-[var(--color-rule)] rounded-xl bg-[var(--color-bg)] text-[var(--color-ink)] focus:outline-none focus:ring-2 focus:ring-cyan-500 placeholder:text-[var(--color-ink)]/30"
+              />
+              <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleTestTavilyKey}
+                  disabled={testingTavilyKey || (!isTavilyKeySet && !newTavilyKey.trim())}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 text-xs font-semibold transition-all disabled:opacity-40 cursor-pointer"
+                >
+                  {testingTavilyKey ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Activity className="w-3.5 h-3.5" />}
+                  {testingTavilyKey ? "Testing..." : "Test Tavily Connection"}
+                </button>
+                {testTavilyResult && (
+                  <span
+                    className={`text-xs font-sans ${
+                      testTavilyResult.success ? "text-emerald-500 font-semibold" : "text-red-500 font-medium"
+                    }`}
+                  >
+                    {testTavilyResult.message}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 

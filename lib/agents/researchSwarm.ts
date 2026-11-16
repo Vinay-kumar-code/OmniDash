@@ -6,12 +6,14 @@ export interface FoundationsData {
   category: string;
   overview: string;
   difficulty_level: string;
+  metrics_heading?: string;
   key_metrics: Array<{
     label: string;
     value: string;
     description: string;
     trend: "positive" | "negative" | "neutral";
   }>;
+  concepts_heading?: string;
   core_concepts: Array<{
     title: string;
     description: string;
@@ -20,32 +22,57 @@ export interface FoundationsData {
 }
 
 export interface ExecutionData {
+  chart_title?: string;
+  chart_type?: "bar_comparison" | "distribution_breakdown" | "milestone_pipeline";
+  chart_items?: Array<{
+    label: string;
+    value: number;
+    unit?: string;
+    annotation?: string;
+  }>;
+  timeline_heading?: string;
   timeline_or_process: Array<{
     step: number;
     title: string;
     description: string;
     time_or_era: string;
   }>;
-  practical_guide_or_solutions: Array<{
+  practical_guide_or_solutions?: Array<{
     challenge_or_area: string;
     solution_or_remedy: string;
     details: string;
   }>;
+  table_heading?: string;
+  table_columns?: [string, string, string];
+  table_rows?: Array<{
+    col1: string;
+    col2: string;
+    col3: string;
+  }>;
 }
 
 export interface StrategyData {
-  time_to_learn_or_maintain: {
+  time_to_learn_or_maintain?: {
     individual_hours: string;
     team_or_intensive_hours: string;
     curve_summary: string;
   };
+  context_heading?: string;
+  context_cards?: Array<{
+    label: string;
+    value: string;
+    description: string;
+  }>;
+  comparison_heading?: string;
   comparative_analysis: {
+    best_case_title?: string;
     best_case_or_advantages: string;
+    worst_case_title?: string;
     worst_case_or_challenges: string;
     tradeoffs_summary: string;
   };
-  risks_and_pitfalls: string[];
-  future_outlook_or_initiatives: string[];
+  risks_and_pitfalls?: string[];
+  future_outlook_or_initiatives?: string[];
   sources: Array<{
     title: string;
     url: string;
@@ -65,6 +92,7 @@ export interface SwarmResult {
     agent3_strategy: boolean;
   };
   durationMs: number;
+  engineUsed?: "tavily" | "wikipedia_ddg";
 }
 
 /**
@@ -186,22 +214,24 @@ export async function runFoundationsAgent(
   webResult?: WebResearchResult,
   fallbackModels?: string[]
 ): Promise<FoundationsData> {
-  const systemPrompt = `You are Agent 1 (Foundations & Core Intelligence).
+  const systemPrompt = `You are Agent 1 (Foundations, KPIs & Architectural Pillars).
 Analyze the topic using the provided live web research context.
-Keep descriptions concise (1-2 sentences) so the JSON is complete and valid.
+Tailor all headings and insights specifically to this domain (e.g. for a game, festival, nutrient, technology, or historical event). DO NOT use generic corporate filler.
 Return ONLY a valid JSON object matching this schema:
 {
-  "category": "string (Accurate domain category)",
-  "difficulty_level": "string (Beginner | Intermediate | Advanced | Expert)",
-  "overview": "string (Rich, factual 2-3 paragraph authoritative executive overview specific to this topic)",
+  "category": "string (Specific domain category, e.g. 'Cultural & Religious Festival', 'Nutrition & Biochemistry', 'Interactive Entertainment & Gaming', 'Quantum Computing & Physics')",
+  "difficulty_level": "string (Domain-appropriate badge, e.g. 'Accessible to All', 'AAA Flagship', 'Essential Micronutrient', 'Advanced Technical')",
+  "overview": "string (Factual, rich 2-3 paragraph authoritative executive overview specific to this topic)",
+  "metrics_heading": "string (Topic-tailored section title, e.g. 'Observance Scale & Sacred Milestones' or 'Launch Specifications & Hardware Benchmarks' or 'Dietary Allowances & Physiological Benchmarks')",
   "key_metrics": [
-    { "label": "string", "value": "string (specific numerical stat/duration/metric)", "description": "string", "trend": "positive" }
+    { "label": "string", "value": "string (concrete stat/number/timeframe)", "description": "string", "trend": "positive" }
   ],
+  "concepts_heading": "string (Topic-tailored section title, e.g. 'Sacred Traditions & Mythological Foundations' or 'Core Gameplay Mechanics & World Engine' or 'Essential Biochemical Pathways & Functions')",
   "core_concepts": [
     { "title": "string", "description": "string", "takeaway": "string" }
   ]
 }
-Ground all facts in reality. No generic placeholders. No markdown outside JSON.`;
+Ground all facts in reality. No markdown outside JSON.`;
 
   const userPrompt = `Topic: "${topic}"\n\nVerified Grounding Information:\n${contextText.slice(0, 5000)}`;
   const raw = await callOpenAiAgent(openai, model, systemPrompt, userPrompt, 45000, fallbackModels);
@@ -214,11 +244,13 @@ Ground all facts in reality. No generic placeholders. No markdown outside JSON.`
   const fallback = getFallbackFoundations(topic, webResult);
   return {
     category: parsed.category || fallback.category,
-    difficulty_level: parsed.difficulty_level || "Intermediate",
+    difficulty_level: parsed.difficulty_level || fallback.difficulty_level || "Intermediate",
     overview: parsed.overview,
+    metrics_heading: parsed.metrics_heading || fallback.metrics_heading,
     key_metrics: Array.isArray(parsed.key_metrics) && parsed.key_metrics.length > 0
       ? parsed.key_metrics
       : fallback.key_metrics,
+    concepts_heading: parsed.concepts_heading || fallback.concepts_heading,
     core_concepts: Array.isArray(parsed.core_concepts) && parsed.core_concepts.length > 0
       ? parsed.core_concepts
       : fallback.core_concepts,
@@ -226,7 +258,7 @@ Ground all facts in reality. No generic placeholders. No markdown outside JSON.`
 }
 
 /**
- * Agent 2: Chronological Timeline, Process Stages, and Practical Solutions
+ * Agent 2: Visual Chart Illustration, Chronological Timeline, and Deep Data Breakdown Table
  */
 export async function runExecutionAgent(
   topic: string,
@@ -236,36 +268,55 @@ export async function runExecutionAgent(
   webResult?: WebResearchResult,
   fallbackModels?: string[]
 ): Promise<ExecutionData> {
-  const systemPrompt = `You are Agent 2 (Lifecycle, Chronology & Tactical Solutions).
+  const systemPrompt = `You are Agent 2 (Visual Chart Illustration, Sequential Lifecycle & Deep Data Breakdown).
 Analyze the topic using the provided live web research context.
-Keep descriptions concise (1-2 sentences) so the JSON is complete and valid.
+DO NOT output generic process or solution templates. Customize every section to the exact nature of this topic.
 Return ONLY a valid JSON object matching this schema:
 {
+  "chart_title": "string (Topic-tailored chart title with real metrics, e.g. 'Top Dietary Sources of Vitamin A (mcg RAE per 100g)' or '10-Day Festival Observance & Devotee Intensity' or 'Franchise Scale, Map Area & Budget Comparison')",
+  "chart_type": "bar_comparison",
+  "chart_items": [
+    { "label": "string", "value": 1234, "unit": "string (e.g. mcg, Days, M sq km, $M)", "annotation": "string (concise fact/detail)" }
+  ],
+  "timeline_heading": "string (Topic-tailored timeline heading, e.g. 'Sacred Ritual Progression & Immersion Schedule' or 'Development Roadmap & Release Lifecycle' or 'Metabolic Pathway: Ingestion to Cellular Target')",
   "timeline_or_process": [
     { "step": 1, "title": "string", "description": "string", "time_or_era": "string" }
   ],
-  "practical_guide_or_solutions": [
-    { "challenge_or_area": "string", "solution_or_remedy": "string", "details": "string" }
+  "table_heading": "string (Topic-tailored 3-column table title, e.g. 'Top Dietary Food Sources & Daily Value' or 'Sacred Offerings, Ritual Items & Cultural Significance' or 'Confirmed Locations, Characters & Feature Upgrades')",
+  "table_columns": ["Column 1 Title", "Column 2 Title", "Column 3 Title"],
+  "table_rows": [
+    { "col1": "string", "col2": "string", "col3": "string" }
   ]
 }
-Provide 4-6 real sequential stages or milestones and 3-5 practical remedies/solutions tailored specifically to the topic. Ground all facts in reality. No markdown outside JSON.`;
+Provide 4-5 chart items with real comparative values, 4-5 sequential milestones, and 4-5 structured table rows. Ground all facts in reality. No markdown outside JSON.`;
 
   const userPrompt = `Topic: "${topic}"\n\nVerified Grounding Information:\n${contextText.slice(0, 5000)}`;
   const raw = await callOpenAiAgent(openai, model, systemPrompt, userPrompt, 45000, fallbackModels);
   const parsed = extractCleanJson(raw);
 
-  if (!parsed || (!Array.isArray(parsed.timeline_or_process) && !Array.isArray(parsed.practical_guide_or_solutions))) {
+  if (!parsed || (!Array.isArray(parsed.timeline_or_process) && !Array.isArray(parsed.chart_items) && !Array.isArray(parsed.table_rows))) {
     throw new Error("Execution agent output invalid");
   }
 
   const fallback = getFallbackExecution(topic, webResult);
   return {
+    chart_title: parsed.chart_title || fallback.chart_title,
+    chart_type: parsed.chart_type || fallback.chart_type || "bar_comparison",
+    chart_items: Array.isArray(parsed.chart_items) && parsed.chart_items.length > 0
+      ? parsed.chart_items
+      : fallback.chart_items,
+    timeline_heading: parsed.timeline_heading || fallback.timeline_heading,
     timeline_or_process: Array.isArray(parsed.timeline_or_process) && parsed.timeline_or_process.length > 0
       ? parsed.timeline_or_process
       : fallback.timeline_or_process,
-    practical_guide_or_solutions: Array.isArray(parsed.practical_guide_or_solutions) && parsed.practical_guide_or_solutions.length > 0
-      ? parsed.practical_guide_or_solutions
-      : fallback.practical_guide_or_solutions,
+    table_heading: parsed.table_heading || fallback.table_heading,
+    table_columns: Array.isArray(parsed.table_columns) && parsed.table_columns.length === 3
+      ? parsed.table_columns
+      : fallback.table_columns,
+    table_rows: Array.isArray(parsed.table_rows) && parsed.table_rows.length > 0
+      ? parsed.table_rows
+      : fallback.table_rows,
+    practical_guide_or_solutions: fallback.practical_guide_or_solutions,
   };
 }
 
@@ -280,21 +331,23 @@ export async function runStrategyAgent(
   webResult?: WebResearchResult,
   fallbackModels?: string[]
 ): Promise<StrategyData> {
-  const systemPrompt = `You are Agent 3 (Strategic Impact, Trade-offs & Outlook).
+  const systemPrompt = `You are Agent 3 (Comparative Analysis, Contextual Guidelines & Verified Sources).
 Analyze the topic using the provided live web research context.
-Keep descriptions concise (1-2 sentences) so the JSON is complete and valid.
+Tailor the comparative analysis and resource guidelines specifically to the domain.
 Return ONLY a valid JSON object matching this schema:
 {
-  "time_to_learn_or_maintain": {
-    "individual_hours": "string",
-    "team_or_intensive_hours": "string",
-    "curve_summary": "string"
-  },
+  "comparison_heading": "string (Topic-tailored comparative title, e.g. 'Therapeutic Health Benefits vs Deficiency & Toxicity' or 'Eco-Friendly Clay Murtis vs Environmental Water Impact' or 'Anticipated Innovations vs Technical & Hardware Demands')",
   "comparative_analysis": {
-    "best_case_or_advantages": "string",
-    "worst_case_or_challenges": "string",
+    "best_case_title": "string (Custom title for the positive / optimal dimension)",
+    "best_case_or_advantages": "string (2-3 detailed sentences)",
+    "worst_case_title": "string (Custom title for the adverse / challenge dimension)",
+    "worst_case_or_challenges": "string (2-3 detailed sentences)",
     "tradeoffs_summary": "string"
   },
+  "context_heading": "string (Topic-tailored operational/guidelines title, e.g. 'Recommended Daily Allowances & Clinical Guidelines' or 'Anticipated System Specs & Gameplay Scope' or 'Community Participation & Ritual Dedication')",
+  "context_cards": [
+    { "label": "string", "value": "string", "description": "string" }
+  ],
   "risks_and_pitfalls": ["string", "string", "string"],
   "future_outlook_or_initiatives": ["string", "string", "string"],
   "sources": [
@@ -313,8 +366,19 @@ Include real web sources provided in the grounding context. Ground all facts in 
 
   const fallback = getFallbackStrategy(topic, webResult);
   return {
-    time_to_learn_or_maintain: parsed.time_to_learn_or_maintain || fallback.time_to_learn_or_maintain,
-    comparative_analysis: parsed.comparative_analysis || fallback.comparative_analysis,
+    comparison_heading: parsed.comparison_heading || fallback.comparison_heading,
+    comparative_analysis: {
+      best_case_title: parsed.comparative_analysis?.best_case_title || fallback.comparative_analysis.best_case_title,
+      best_case_or_advantages: parsed.comparative_analysis?.best_case_or_advantages || fallback.comparative_analysis.best_case_or_advantages,
+      worst_case_title: parsed.comparative_analysis?.worst_case_title || fallback.comparative_analysis.worst_case_title,
+      worst_case_or_challenges: parsed.comparative_analysis?.worst_case_or_challenges || fallback.comparative_analysis.worst_case_or_challenges,
+      tradeoffs_summary: parsed.comparative_analysis?.tradeoffs_summary || fallback.comparative_analysis.tradeoffs_summary,
+    },
+    context_heading: parsed.context_heading || fallback.context_heading,
+    context_cards: Array.isArray(parsed.context_cards) && parsed.context_cards.length > 0
+      ? parsed.context_cards
+      : fallback.context_cards,
+    time_to_learn_or_maintain: fallback.time_to_learn_or_maintain,
     risks_and_pitfalls: Array.isArray(parsed.risks_and_pitfalls) && parsed.risks_and_pitfalls.length > 0
       ? parsed.risks_and_pitfalls
       : fallback.risks_and_pitfalls,
@@ -365,12 +429,14 @@ export function getFallbackFoundations(topic: string, web?: WebResearchResult): 
       category,
       difficulty_level: "Inclusive / Community",
       overview,
+      metrics_heading: "Observance Scale & Sacred Milestones",
       key_metrics: [
         { label: "Festival Duration", value: "10 Days", description: "Bhadrapada Shukla Chaturthi to Ananta Chaturdashi", trend: "positive" },
         { label: "Sacred Patri Count", value: "21 Leaves", description: "Medicinal leaves offered in traditional pooja", trend: "neutral" },
         { label: "Annual Devotees", value: "100M+", description: "Devotees participating across India and diaspora", trend: "positive" },
         { label: "Immersion Scale", value: "150,000+", description: "Annual visarjan in major urban hubs like Mumbai", trend: "positive" },
       ],
+      concepts_heading: "Sacred Legends, Ritual Protocols & Symbolism",
       core_concepts: [
         { title: "Pranapratishtha & Sthapana", description: "Vedic ritual consecration and ceremonial installation of the clay murti.", takeaway: "Core spiritual invocation invoking Lord Ganesha." },
         { title: "21 Patri Botanical Worship", description: "Offering 21 medicinal leaves (Durva, Bilva, Tulasi, Apamarga) honoring local ecology and biodiversity.", takeaway: "Harmonizes devotion with ancient environmental science." },
@@ -388,12 +454,14 @@ export function getFallbackFoundations(topic: string, web?: WebResearchResult): 
       category,
       difficulty_level: "Essential / Foundational",
       overview,
+      metrics_heading: "Dietary Allowances & Physiological Benchmarks",
       key_metrics: [
         { label: "Nutrient Classification", value: isFatSoluble ? "Fat-Soluble Vitamin" : "Essential Micronutrient", description: "Requires dietary lipids for enteric absorption", trend: "positive" },
         { label: "Daily Recommended Intake", value: "700 - 900 mcg RAE", description: "Standard adult Recommended Dietary Allowance (RDA)", trend: "neutral" },
         { label: "Primary Physiological Role", value: hasVision ? "Photoreception & Vision" : "Immunity & Cellular Health", description: "Essential for opsin binding and epithelial integrity", trend: "positive" },
         { label: "Deficiency Risk Factor", value: hasVision ? "Night Blindness" : "Immune Vulnerability", description: "Mitigated by balanced dietary intake and fortification", trend: "positive" },
       ],
+      concepts_heading: "Biochemical Mechanisms & Cellular Functions",
       core_concepts: [
         { title: "Preformed Retinoids vs Provitamin Carotenoids", description: "Obtained as active preformed retinol in animal foods (dairy, liver, eggs) or provitamin beta-carotene in plant foods (carrots, sweet potatoes).", takeaway: "Both plant and animal dietary sources support physiological requirements." },
         { title: "Visual Photoreception & Rhodopsin Synthesis", description: "Retinal, an active derivative, binds with the protein opsin in retinal rod cells to produce rhodopsin, essential for low-light night vision.", takeaway: "Directly protects against night blindness and progressive ocular xerophthalmia." },
@@ -410,12 +478,14 @@ export function getFallbackFoundations(topic: string, web?: WebResearchResult): 
       category,
       difficulty_level: "AAA Flagship Title",
       overview,
+      metrics_heading: "Flagship Specifications & Industry Scale",
       key_metrics: [
         { label: isGTA ? "Primary Developer" : "Studio / Publisher", value: isGTA ? "Rockstar Games" : "Major Studio", description: "Acclaimed for groundbreaking open-world blockbusters", trend: "positive" },
         { label: isGTA ? "World Scope & Setting" : "World Scope", value: isGTA ? "State of Leonida (Vice City)" : "Immersive Open World", description: "High-density simulation with dynamic AI and emergent physics", trend: "positive" },
         { label: "Industry Reach", value: isGTA ? "100M+ Trailer Views" : "Global Gaming Community", description: "Historic engagement and mainstream cultural anticipation", trend: "positive" },
         { label: "Target Platforms", value: "PS5 & Xbox Series X/S", description: "Engineered specifically for 9th-generation console architectures", trend: "neutral" },
       ],
+      concepts_heading: "Core Gameplay Systems & World Architecture",
       core_concepts: [
         { title: isGTA ? "Dual-Protagonist Narrative (Lucia & Jason)" : "Character Narrative & Storyline", description: "Engaging crime drama featuring character-switching dynamics, relationship arcs, and high-stakes criminal undertakings.", takeaway: "Elevates interactive storytelling with cinematic character-driven depth." },
         { title: "Dynamic Living Open-World Simulation", description: "Advanced pedestrian behavioral models, dense traffic patterns, reactive ecosystems, and seamless transitions between urban and wilderness zones.", takeaway: "Redefines ambient immersion and player agency in virtual spaces." },
@@ -535,62 +605,124 @@ export function getFallbackExecution(topic: string, web?: WebResearchResult): Ex
 
   if (isFestival) {
     return {
+      chart_title: "10-Day Festival Observance & Devotee Engagement Curve",
+      chart_type: "bar_comparison",
+      chart_items: [
+        { label: "Day 1 (Sthapana)", value: 95, unit: "Intensity", annotation: "Pranapratishtha & Murti installation" },
+        { label: "Days 2-4 (Domestic Pooja)", value: 72, unit: "Intensity", annotation: "Home rituals & 21 modaks naivedyam" },
+        { label: "Days 5-7 (Pandal Aartis)", value: 88, unit: "Intensity", annotation: "Public bhajans, concerts & prasadam" },
+        { label: "Day 10 (Visarjan)", value: 100, unit: "Intensity", annotation: "Peak immersion processions & dhol-tasha" },
+      ],
+      timeline_heading: "10-Day Sacred Ritual Progression & Observance Schedule",
       timeline_or_process: [
         { step: 1, title: "Clay Murti Sculpting & Pandal Setup", description: "Artisans handcraft eco-friendly clay (Shaadu Maati) idols; community committees erect festive pandals.", time_or_era: "Pre-Festival" },
         { step: 2, title: "Day 1: Sthapana & 16-Step Shodashopachara", description: "Pranapratishtha ceremony, offering 21 sacred leaves (Patri), and recitation of Ganesha Atharvashirsha.", time_or_era: "Day 1" },
         { step: 3, title: "Days 2 to 9: Community Celebrations & Aarti", description: "Daily evening aarti, bhajans, classical music concerts, cultural events, and community prasadam distributions.", time_or_era: "Days 2-9" },
         { step: 4, title: "Day 10: Grand Visarjan Procession", description: "Joyous public processions with dhol-tasha beats, music, and chanting culminating in water immersion at lakes or sea.", time_or_era: "Day 10" },
       ],
+      table_heading: "Sacred Offerings, 21 Patri Herbs & Cultural Significance",
+      table_columns: ["Sacred Offering / Element", "Traditional Practice", "Spiritual & Ecological Significance"],
+      table_rows: [
+        { col1: "Modak (Kudumu)", col2: "21 steamed sweet dumplings of rice flour, jaggery & coconut", col3: "Symbolizes supreme spiritual bliss (Ananda) and inner wisdom" },
+        { col1: "21 Botanical Patri Leaves", col2: "Durva, Bilva, Tulasi, Apamarga offered during Shodashopachara", col3: "Ancient Ayurvedic herbarium promoting seasonal biodiversity" },
+        { col1: "Shaadu Maati Clay Idol", col2: "Handcrafted unbaked clay with turmeric and vegetable dyes", col3: "100% biodegradable; dissolves naturally into water without pollution" },
+        { col1: "Pranapratishtha Invocation", col2: "Vedic mantras reciting Ganesha Atharvashirsha on Shukla Chaturthi", col3: "Invokes cosmic divine consciousness into the temporary physical form" },
+        { col1: "Visarjan Immersion", col2: "Ceremonial procession returning clay murti to lakes, rivers or sea", col3: "Embodies impermanence, cosmic detachment, and seasonal renewal" },
+      ],
       practical_guide_or_solutions: [
         { challenge_or_area: "Eco-Friendly Murtis", solution_or_remedy: "Choose 100% natural clay (Shaadu Maati) idols with natural turmeric and water-soluble colors.", details: "Eliminates toxic chemical pollution in lakes and rivers." },
         { challenge_or_area: "Water Protection & Immersion", solution_or_remedy: "Use municipal artificial immersion ponds and home immersion buckets.", details: "Guarantees clean natural water bodies and easy recycling of silt." },
-        { challenge_or_area: "Crowd & Pandal Safety", solution_or_remedy: "Maintain clear emergency queue lanes, licensed electrical wiring, and certified fire extinguishers.", details: "Ensures smooth, incident-free celebrations for families." },
-        { challenge_or_area: "Prasadam Hygiene", solution_or_remedy: "Prepare modaks and traditional sweets with pure ingredients and hygienic food handling standards.", details: "Protects public health during large-scale community distribution." },
       ],
     };
   }
 
   if (isNutrition) {
     return {
+      chart_title: "Top Dietary Sources of Vitamin A (mcg RAE per 100g)",
+      chart_type: "bar_comparison",
+      chart_items: [
+        { label: "Beef Liver", value: 9442, unit: "mcg", annotation: "Highest natural preformed retinol" },
+        { label: "Sweet Potato (Baked)", value: 1043, unit: "mcg", annotation: "Rich provitamin A beta-carotene" },
+        { label: "Carrots (Cooked)", value: 835, unit: "mcg", annotation: "High bioavailability carotenoids" },
+        { label: "Spinach (Cooked)", value: 469, unit: "mcg", annotation: "Lutein & provitamin synergy" },
+        { label: "Egg Yolk / Dairy", value: 158, unit: "mcg", annotation: "Whole food lipid matrix supports uptake" },
+      ],
+      timeline_heading: "Nutrient Pathway: Enteric Digestion to Cellular Target",
       timeline_or_process: [
         { step: 1, title: "Dietary Ingestion & Pro-Vitamin Cleavage", description: "Consuming balanced carotenoids (plant sources) or preformed retinyl esters (animal foods) alongside healthy dietary fats.", time_or_era: "Ingestion Stage" },
         { step: 2, title: "Enteric Micellar Packaging & Absorption", description: "Bile salts and pancreatic lipases solubilize vitamins into mixed micelles for uptake across intestinal enterocytes.", time_or_era: "Absorption Stage" },
         { step: 3, title: "Chylomicron Transport & Hepatic Storage", description: "Packaged into chylomicrons, transported through lymphatic channels, and stored primarily in liver stellate cells.", time_or_era: "Storage Stage" },
         { step: 4, title: "Targeted Tissue Bioavailability & Physiological Utilization", description: "Bound to Retinol Binding Protein (RBP4) for systemic circulation, visual pigment opsin synthesis, and gene transcription.", time_or_era: "Active Utilization" },
       ],
+      table_heading: "Key Dietary Sources, Yield & Bioavailability Guidelines",
+      table_columns: ["Food / Source", "Active Nutrient Yield", "Bioavailability & Preparation Note"],
+      table_rows: [
+        { col1: "Organ Meats (Beef / Calf Liver)", col2: "9,400+ mcg RAE / 100g", col3: "Preformed retinol; consume once weekly to avoid hypervitaminosis" },
+        { col1: "Orange-Fleshed Sweet Potatoes", col2: "1,040 mcg RAE / medium potato", col3: "Pair with dietary lipids (olive oil) to optimize carotenoid cleavage" },
+        { col1: "Cooked Carrots & Winter Squash", col2: "835 mcg RAE / cup", col3: "Light steaming breaks tough plant cell walls, increasing absorption" },
+        { col1: "Dark Leafy Greens (Spinach, Kale)", col2: "450 - 500 mcg RAE / cup", col3: "Rich in antioxidants that protect retinol from oxidative degradation" },
+        { col1: "Fortified Dairy & Whole Milk", col2: "110 - 150 mcg RAE / glass", col3: "Stable dietary baseline for daily recommended minimum maintenance" },
+      ],
       practical_guide_or_solutions: [
         { challenge_or_area: "Absorption Optimization", solution_or_remedy: "Pair nutrient-rich foods with healthy dietary fats (olive oil, avocados, nuts).", details: "Enhances lipid-soluble micelle formation and intestinal uptake." },
-        { challenge_or_area: "Preventing Nutrient Toxicity", solution_or_remedy: "Prioritize dietary beta-carotene from plants over high-dose synthetic preformed retinol supplements.", details: "Body regulates plant carotenoid conversion, eliminating hypervitaminosis risk." },
-        { challenge_or_area: "Food Preparation & Retention", solution_or_remedy: "Lightly steam or saute vegetables rather than prolonged boiling in water.", details: "Breaks plant cell walls to release carotenoids without degrading heat-sensitive nutrients." },
-        { challenge_or_area: "Detecting Early Deficiency", solution_or_remedy: "Monitor for early signs such as delayed darkness adaptation, dry eyes, or impaired wound healing.", details: "Enables proactive dietary adjustments before clinical deficiency develops." },
       ],
     };
   }
 
   if (isGaming) {
     return {
+      chart_title: "Franchise Scale, Map Area & Budget Benchmark (Est.)",
+      chart_type: "bar_comparison",
+      chart_items: [
+        { label: "GTA VI Est. Budget ($M)", value: 1000, unit: "$M", annotation: "Next-gen flagship production & marketing" },
+        { label: "GTA V Production Budget ($M)", value: 265, unit: "$M", annotation: "2013 launch production and marketing" },
+        { label: "GTA VI Map Area (Est. sq km)", value: 135, unit: "sq km", annotation: "State of Leonida + Vice City metro" },
+        { label: "GTA V Map Area (sq km)", value: 76, unit: "sq km", annotation: "Los Santos & Blaine County" },
+      ],
+      timeline_heading: "Development Roadmap & Franchise Lifecycle Milestones",
       timeline_or_process: [
         { step: 1, title: "Pre-Production & Narrative Scripting", description: "Conceptualizing core game mechanics, writing character arcs, and developing proprietary engine architecture.", time_or_era: "Phase 1: Pre-Production" },
         { step: 2, title: "Motion Capture & Environmental World-Building", description: "Capturing actor performances and building detailed 3D assets for urban and rural settings across Leonida.", time_or_era: "Phase 2: Production" },
         { step: 3, title: "Systems Integration, AI & Physics Simulation", description: "Implementing dynamic pedestrian routines, traffic algorithms, vehicle handling models, and weather systems.", time_or_era: "Phase 3: Integration" },
         { step: 4, title: "Polishing, Optimization & Global Launch", description: "Multi-platform performance optimization, rigorous QA testing, public trailers, and worldwide release distribution.", time_or_era: "Phase 4: Release" },
       ],
+      table_heading: "Confirmed Locations, Mechanics & Next-Gen Innovations",
+      table_columns: ["System / Element", "Confirmed Details", "Gameplay Impact"],
+      table_rows: [
+        { col1: "Dual Protagonists (Lucia & Jason)", col2: "Modern Bonnie & Clyde crime dynamic in Vice City", col3: "Character switching, tactical co-op combat, and shared inventory" },
+        { col1: "State of Leonida & Vice City", col2: "Expanded Florida satire including Everglades and Florida Keys", col3: "Unrivaled urban interior density, wetlands, and water physics" },
+        { col1: "RAGE 9 Engine Innovations", col2: "Volumetric real-time lighting, physical deformation & ragdoll", col3: "Engineered natively for 9th-gen consoles (PS5 / Xbox Series X|S)" },
+        { col1: "Living NPC Social Ecosystem", col2: "In-game viral social video parody and reactive civilian AI", col3: "Living, breathing metropolis with spontaneous world encounters" },
+      ],
       practical_guide_or_solutions: [
         { challenge_or_area: "Hardware Performance Optimization", solution_or_remedy: "Target dynamic resolution scaling and ultra-fast SSD streaming pipelines.", details: "Ensures seamless 60 FPS gameplay without texture pop-in." },
-        { challenge_or_area: "Player Engagement & Progression", solution_or_remedy: "Balance core story milestones with emergent open-world side missions and activities.", details: "Maintains high player retention across diverse playstyles." },
-        { challenge_or_area: "Multiplayer Server Stability", solution_or_remedy: "Deploy distributed microservice architectures and predictive matchmaking algorithms.", details: "Mitigates launch-window server latency and connection drops." },
-        { challenge_or_area: "Long-Term Content Lifecycle", solution_or_remedy: "Plan regular seasonal content drops, narrative expansions, and community events.", details: "Extends active title lifespan across multiple gaming generations." },
       ],
     };
   }
 
   if (isAgriculture) {
     return {
+      chart_title: "Crop Growth Cycle & Input Distribution Benchmark",
+      chart_type: "bar_comparison",
+      chart_items: [
+        { label: "Vegetative Phase (Days)", value: 45, unit: "Days", annotation: "Rapid root and foliage expansion" },
+        { label: "Flowering & Setting (Days)", value: 30, unit: "Days", annotation: "Peak nutrient & water demand" },
+        { label: "Maturation & Ripening (Days)", value: 35, unit: "Days", annotation: "Sugar/grain accumulation phase" },
+        { label: "Target Yield (Tons/Acre)", value: 20, unit: "Tons/Acre", annotation: "High-efficiency commercial harvest" },
+      ],
+      timeline_heading: "Crop Cultivation Lifecycle & Field Management Sequence",
       timeline_or_process: [
         { step: 1, title: "Soil Preparation & Seed Treatment", description: "Deep tilling, testing pH, and treating certified seeds with organic bio-fungicides.", time_or_era: "Weeks 1-2" },
         { step: 2, title: "Vegetative Growth & Water Management", description: "Calibrated drip irrigation and balanced nitrogen-phosphorus fertilization.", time_or_era: "Weeks 3-6" },
         { step: 3, title: "Flowering & Integrated Pest Control", description: "Monitoring for early pest infestations and deploying biological predators or organic repellents.", time_or_era: "Weeks 7-10" },
         { step: 4, title: "Harvesting & Post-Harvest Processing", description: "Harvesting at optimal moisture levels followed by grading, sorting, and cold storage.", time_or_era: "Weeks 11-14" },
+      ],
+      table_heading: "Agronomic Challenges, Precision Remedies & Field Notes",
+      table_columns: ["Challenge / Field Issue", "Recommended Agronomic Solution", "Operational Notes & Details"],
+      table_rows: [
+        { col1: "Water Conservation", col2: "Install sensor-activated drip irrigation systems", col3: "Reduces water consumption by up to 40% while preventing root rot" },
+        { col1: "Pest Resistance", col2: "Rotate crop families and apply botanical neem extracts proactively", col3: "Interrupts pest life cycles without synthetic chemical residues" },
+        { col1: "Soil Nutrient Depletion", col2: "Incorporate legume green manures and vermicompost between cultivation cycles", col3: "Naturally fixes atmospheric nitrogen and restores organic carbon" },
       ],
       practical_guide_or_solutions: [
         { challenge_or_area: "Water Conservation", solution_or_remedy: "Install soil-moisture sensor-activated drip irrigation systems.", details: "Reduces water consumption by up to 40% while preventing root rot." },
@@ -602,11 +734,27 @@ export function getFallbackExecution(topic: string, web?: WebResearchResult): Ex
 
   if (isQuantum) {
     return {
+      chart_title: "Quantum Hardware Benchmarks & Coherence Metrics",
+      chart_type: "bar_comparison",
+      chart_items: [
+        { label: "Two-Qubit Fidelity (%)", value: 99.9, unit: "%", annotation: "State-of-the-art superconducting gates" },
+        { label: "Coherence Time T1 (µs)", value: 120, unit: "µs", annotation: "Superconducting transmon qubit lifetime" },
+        { label: "Physical Qubits per Logical", value: 1000, unit: "Qubits", annotation: "Surface code distance 7-9 requirements" },
+        { label: "Cryogenic Operating Temp (mK)", value: 15, unit: "mK", annotation: "Dilution refrigerator base temperature" },
+      ],
+      timeline_heading: "Quantum Architecture & Fault-Tolerant Engineering Roadmap",
       timeline_or_process: [
         { step: 1, title: "Qubit Fabrication & Dilution Cryogenics", description: "Manufacturing superconducting circuit loops cooled to milliKelvin temperatures.", time_or_era: "Physical Substrate" },
         { step: 2, title: "Microwave Pulse Calibration & Gate Tuning", description: "Precision microwave frequency tuning for single-qubit and two-qubit entanglement gates.", time_or_era: "Control Calibration" },
         { step: 3, title: "Surface Code Error Detection & Syndrome Measurements", description: "Continuous syndrome extraction on physical qubits to detect and correct bit and phase flips.", time_or_era: "Error Correction" },
         { step: 4, title: "Fault-Tolerant Logical Algorithm Execution", description: "Executing quantum circuits across protected logical qubits for chemistry and optimization workloads.", time_or_era: "Computational Utility" },
+      ],
+      table_heading: "Decoherence Mitigation, Qubit Controls & Engineering Solutions",
+      table_columns: ["Hardware Challenge", "Engineering Solution", "Implementation Details"],
+      table_rows: [
+        { col1: "Decoherence Suppression", col2: "Employ multi-layered mu-metal magnetic shielding and cryogenic attenuators", col3: "Isolates delicate quantum states from thermal and electromagnetic noise" },
+        { col1: "Cross-Talk Mitigation", col2: "Implement frequency detuning and randomized dynamical decoupling sequences", col3: "Suppresses unwanted capacitive and inductive qubit interactions" },
+        { col1: "Control Line Heat Load", col2: "Transition to cryogenic CMOS multiplexers inside 4K stage", col3: "Drastically cuts coaxial wiring count for 1,000+ qubit systems" },
       ],
       practical_guide_or_solutions: [
         { challenge_or_area: "Decoherence Suppression", solution_or_remedy: "Employ multi-layered mu-metal magnetic shielding and cryogenic attenuators.", details: "Isolates delicate quantum states from thermal and electromagnetic noise." },
@@ -616,11 +764,27 @@ export function getFallbackExecution(topic: string, web?: WebResearchResult): Ex
   }
 
   return {
+    chart_title: `${topic} Analytical Metrics & Domain Distribution`,
+    chart_type: "bar_comparison",
+    chart_items: [
+      { label: "Domain Relevance", value: 92, unit: "%", annotation: "High significance in contemporary landscape" },
+      { label: "Methodological Maturity", value: 85, unit: "%", annotation: "Established frameworks and best practices" },
+      { label: "Execution Complexity", value: 70, unit: "%", annotation: "Requires structured domain competence" },
+      { label: "Ecosystem Impact", value: 88, unit: "%", annotation: "Substantial influence across related sectors" },
+    ],
+    timeline_heading: `Lifecycle Roadmap & Operational Progression`,
     timeline_or_process: [
       { step: 1, title: "Discovery & Requirements Architecture", description: `Initial scoping, baseline knowledge gathering, and environmental prerequisites for ${topic}.`, time_or_era: "Phase 1: Initiation" },
       { step: 2, title: "Core Implementation & Execution", description: `Executing primary procedures, protocols, and standard operational workflows.`, time_or_era: "Phase 2: Execution" },
       { step: 3, title: "Verification, Testing & Optimization", description: `Active monitoring, performance validation, and continuous metric refinement.`, time_or_era: "Phase 3: Optimization" },
       { step: 4, title: "Review, Scaling & Evolution", description: `Evaluating outcomes, long-term governance, and iterative future enhancements.`, time_or_era: "Phase 4: Maturation" },
+    ],
+    table_heading: `Operational Considerations & Strategic Solutions`,
+    table_columns: ["Key Consideration", "Recommended Action / Protocol", "Expected Outcome / Impact"],
+    table_rows: [
+      { col1: "Operational Consistency", col2: "Establish standard operating procedures and verified documentation early", col3: "Maintains high fidelity and minimizes variance in execution" },
+      { col1: "Risk Management", col2: "Institute regular feedback loops and early-warning monitoring checkpoints", col3: "Identifies bottlenecks and vulnerabilities before they escalate" },
+      { col1: "Scalability & Sustainability", col2: "Design modular, resilient practices that adapt to expanding demands", col3: "Ensures long-term viability and resource efficiency" },
     ],
     practical_guide_or_solutions: [
       { challenge_or_area: "Operational Consistency", solution_or_remedy: "Establish standard operating procedures and verified documentation early.", details: "Maintains high fidelity and minimizes variance in execution." },
@@ -644,13 +808,22 @@ export function getFallbackStrategy(topic: string, web?: WebResearchResult): Str
 
   if (isFestival) {
     return {
+      comparison_heading: "Festive Joy vs. Environmental & Urban Considerations",
       time_to_learn_or_maintain: {
         individual_hours: "1-3 days (Household domestic pooja and family rituals)",
         team_or_intensive_hours: "10-12 days (Sarvajanik community pandal committees & volunteers)",
         curve_summary: "Accessible to all generations with rich oral, musical, and devotional traditions.",
       },
+      context_heading: "⏱️ Community Time Allocation & Devotee Participation",
+      context_cards: [
+        { label: "Household Observance", value: "1-3 Days", description: "Family sthapana, domestic aarti, and offering 21 modaks" },
+        { label: "Public Pandal Festivities", value: "10-12 Days", description: "Sarvajanik committees, daily cultural programs, and grand immersion" },
+        { label: "Community Immersion", value: "Day 10 (Anant Chaturdashi)", description: "Peak celebratory procession and community visarjan" },
+      ],
       comparative_analysis: {
+        best_case_title: "🌟 Vibrant Community Harmony & Eco-Conscious Observance",
         best_case_or_advantages: "Profound social unity, cultural bonding, charitable community drives, and sustainable eco-friendly traditions.",
+        worst_case_title: "⚠️ Urban Strain & Ecological Impact",
         worst_case_or_challenges: "Water pollution from non-biodegradable plaster of paris idols, traffic congestion, and noise pollution.",
         tradeoffs_summary: "Transitioning to clay idols and artificial immersion ponds preserves festive joy while protecting the natural environment.",
       },
@@ -670,13 +843,22 @@ export function getFallbackStrategy(topic: string, web?: WebResearchResult): Str
 
   if (isNutrition) {
     return {
+      comparison_heading: "Nutritional Adequacy vs. Deficiencies & Toxicity Risks",
       time_to_learn_or_maintain: {
         individual_hours: "Daily Consistency (700-900 mcg RAE daily dietary intake)",
         team_or_intensive_hours: "Clinical / Public Health (Community micronutrient fortification & education)",
         curve_summary: "Straightforward dietary integration through balanced whole foods and diverse meal planning.",
       },
+      context_heading: "⏱️ Dietary Guidance & Daily Intake Standards",
+      context_cards: [
+        { label: "Adult Daily Allowance (RDA)", value: "700-900 mcg RAE", description: "Daily recommended intake for healthy adults" },
+        { label: "Tolerable Upper Limit (UL)", value: "3,000 mcg RAE", description: "Maximum safe intake of preformed retinol from supplements/liver" },
+        { label: "Plant Carotenoid Conversion", value: "12:1 Beta-Carotene", description: "Natural intestinal conversion ratio with zero toxicity risk" },
+      ],
       comparative_analysis: {
+        best_case_title: "🌟 Optimal Cellular Immunity & Visual Acuity",
         best_case_or_advantages: "Optimal visual acuity, robust epithelial immunity, healthy embryonic development, and long-term ocular protection.",
+        worst_case_title: "⚠️ Deficiency Complications & Hypervitaminosis Risks",
         worst_case_or_challenges: "Progressive xerophthalmia and night blindness from deficiency, or hepatic toxicity from chronic over-supplementation of preformed retinol.",
         tradeoffs_summary: "Consuming provitamin carotenoids from plant sources carries virtually zero risk of hypervitaminosis compared to synthetic retinol supplements.",
       },
@@ -696,13 +878,22 @@ export function getFallbackStrategy(topic: string, web?: WebResearchResult): Str
 
   if (isGaming) {
     return {
+      comparison_heading: "Generational Innovation vs. Production Complexity",
       time_to_learn_or_maintain: {
         individual_hours: "40 - 100+ Hours (Campaign storyline, side exploration, and emergent sandbox gameplay)",
         team_or_intensive_hours: "Hundreds of Hours (Collaborative online multiplayer, heists, and community events)",
         curve_summary: "Intuitive pick-up-and-play mechanics combined with deep emergent systems and vehicle mastery.",
       },
+      context_heading: "⏱️ Player Engagement & Immersion Demands",
+      context_cards: [
+        { label: "Campaign Storyline", value: "40-70 Hours", description: "Main narrative arcs following Lucia & Jason through Vice City" },
+        { label: "Full Completionist Exploration", value: "120+ Hours", description: "Emergent world events, collectibles, and side activities" },
+        { label: "Persistent Online Ecosystem", value: "Hundreds of Hours", description: "Dynamic evolving multiplayer missions and community heists" },
+      ],
       comparative_analysis: {
+        best_case_title: "🌟 Industry-Defining Immersion & Decade-Long Replayability",
         best_case_or_advantages: "Generational open-world immersion, groundbreaking narrative depth, critical acclaim, and decade-long replayability.",
+        worst_case_title: "⚠️ Hardware Bottlenecks & Launch Constraints",
         worst_case_or_challenges: "Platform hardware constraints, launch-window server bottlenecks, or prolonged development cycles.",
         tradeoffs_summary: "Extended multi-year production cycles require significant capital investment but yield unparalleled world fidelity and cultural impact.",
       },
@@ -722,13 +913,22 @@ export function getFallbackStrategy(topic: string, web?: WebResearchResult): Str
 
   if (isQuantum) {
     return {
+      comparison_heading: "Exponential Quantum Advantage vs. Decoherence Constraints",
       time_to_learn_or_maintain: {
         individual_hours: "6-12 Months (Foundational quantum mechanics and Qiskit/Cirq programming)",
         team_or_intensive_hours: "3-5 Years (Full-stack cryogenic, RF engineering, and fault-tolerant architecture)",
         curve_summary: "Steep conceptual learning curve requiring advanced linear algebra, quantum physics, and microwave engineering.",
       },
+      context_heading: "⏱️ Research & Implementation Demands",
+      context_cards: [
+        { label: "Algorithm Prototyping", value: "3-6 Months", description: "Formulating quantum circuits via Qiskit/Cirq on simulators" },
+        { label: "Hardware Pulse Tuning", value: "Continuous / Daily", description: "Automated calibration cycles for microwave control lines" },
+        { label: "Fault-Tolerant Scaled Systems", value: "5-10 Year Roadmap", description: "Multi-thousand logical qubit systems with surface codes" },
+      ],
       comparative_analysis: {
+        best_case_title: "🌟 Fault-Tolerant Quantum Superiority",
         best_case_or_advantages: "Exponential computational speedups for molecular simulation, materials discovery, and complex optimization.",
+        worst_case_title: "⚠️ Cryogenic Noise & Decoherence Bottlenecks",
         worst_case_or_challenges: "Severe environmental decoherence, high error rates, and million-dollar cryogenic infrastructure requirements.",
         tradeoffs_summary: "NISQ-era QPUs provide hybrid algorithmic utility today while long-term investments develop fault-tolerant logical qubits.",
       },
@@ -747,13 +947,21 @@ export function getFallbackStrategy(topic: string, web?: WebResearchResult): Str
   }
 
   return {
+    comparison_heading: "Comparative Performance & Strategic Tradeoffs",
     time_to_learn_or_maintain: {
       individual_hours: "10-25 hours (Foundational mastery)",
       team_or_intensive_hours: "40-80 hours (Comprehensive organizational deployment)",
       curve_summary: "Progressive learning path with immediate early utility.",
     },
+    context_heading: "⏱️ Operational Scale & Resource Demands",
+    context_cards: [
+      { label: "Individual / Single Person", value: "10-25 hours", description: "Required focus hours and hands-on maintenance." },
+      { label: "Team / Scaled Operations", value: "40-80 hours", description: "Collaborative or multi-person throughput allocation." },
+    ],
     comparative_analysis: {
+      best_case_title: "🌟 Optimal Scenario & Key Advantages",
       best_case_or_advantages: "High efficiency, optimal outcomes, and profound community or operational value.",
+      worst_case_title: "⚠️ High-Risk Scenario & Known Pitfalls",
       worst_case_or_challenges: "Bottlenecks or resource strain under inadequate planning.",
       tradeoffs_summary: "Balanced discipline and verified inputs ensure consistent success.",
     },
@@ -778,7 +986,7 @@ export function getFallbackStrategy(topic: string, web?: WebResearchResult): Str
 export async function executeResearchSwarm(
   topic: string,
   contextText: string,
-  config: { apiKey: string; model: string; fallbackModels?: string[] }
+  config: { apiKey: string; model: string; fallbackModels?: string[]; tavilyApiKey?: string }
 ): Promise<SwarmResult> {
   const startTime = Date.now();
   const trimmedTopic = topic.trim();
@@ -787,9 +995,9 @@ export async function executeResearchSwarm(
   console.log(`[ResearchSwarm] Step 1: Launching Live Web Research Agent for "${trimmedTopic}"`);
   let webResearch: WebResearchResult;
   try {
-    webResearch = await searchWebForTopic(trimmedTopic);
+    webResearch = await searchWebForTopic(trimmedTopic, config.tavilyApiKey);
     console.log(
-      `[ResearchSwarm] Web research resolved: "${webResearch.title}" | Category: ${webResearch.detectedCategory} | Sources: ${webResearch.sources.length}`
+      `[ResearchSwarm] Web research resolved: "${webResearch.title}" | Category: ${webResearch.detectedCategory} | Engine: ${webResearch.engineUsed || "unknown"} | Sources: ${webResearch.sources.length}`
     );
   } catch (err: any) {
     console.warn("[ResearchSwarm] Web research agent encountered issue:", err?.message);
@@ -801,6 +1009,7 @@ export async function executeResearchSwarm(
       sources: [{ title: `${trimmedTopic} - Wikipedia`, url: `https://en.wikipedia.org/wiki/${encodeURIComponent(trimmedTopic)}` }],
       detectedCategory: "General Knowledge",
       groundedFacts: "",
+      engineUsed: "wikipedia_ddg",
     };
   }
 
@@ -900,5 +1109,6 @@ ${contextText ? `=== USER UPLOADED CONTEXT ===\n${contextText}` : ""}
       agent3_strategy: agent3Success,
     },
     durationMs,
+    engineUsed: webResearch.engineUsed,
   };
 }

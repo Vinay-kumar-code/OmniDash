@@ -45,11 +45,15 @@ export default async function DashboardPage({ params }: PageProps) {
         const rawHtml = generateDeterministicDashboard(parsed);
         const cleanHtml = DOMPurify.sanitize(rawHtml, {
           FORCE_BODY: true,
-          ADD_TAGS: ["style", "svg", "path", "rect", "circle", "text", "line", "g", "polygon", "polyline"],
+          ADD_TAGS: [
+            "style", "svg", "path", "rect", "circle", "text", "line", "g", "polygon", "polyline",
+            "linearGradient", "radialGradient", "stop", "defs"
+          ],
           ADD_ATTR: [
             "stroke", "fill", "viewBox", "d", "x", "y", "width", "height", "cx", "cy", "r",
-            "stroke-width", "stroke-linecap", "stroke-linejoin", "text-anchor", "font-size",
-            "font-weight", "opacity", "rx", "ry", "target", "rel", "href"
+            "stroke-width", "stroke-linecap", "stroke-linejoin", "stroke-dasharray", "text-anchor", "font-size",
+            "font-weight", "font-family", "opacity", "rx", "ry", "target", "rel", "href",
+            "id", "x1", "y1", "x2", "y2", "offset", "stop-color", "stop-opacity"
           ],
         });
 

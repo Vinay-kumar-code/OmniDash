@@ -61,6 +61,15 @@ export function setFallbackModels(models: string[] | string): void {
   setSetting("openrouter_fallback_models", JSON.stringify(unique));
 }
 
+export function getTavilyApiKey(): string {
+  const dbKey = getSetting("tavily_api_key");
+  return (dbKey || process.env.TAVILY_API_KEY || "").trim();
+}
+
+export function setTavilyApiKey(key: string): void {
+  setSetting("tavily_api_key", key.trim());
+}
+
 export function getOpenRouterConfig() {
   const dbApiKey = getSetting("openrouter_api_key");
   const dbModel = getSetting("openrouter_model");
@@ -77,6 +86,7 @@ export function getOpenRouterConfig() {
   }
 
   const fallbackModels = getFallbackModels();
+  const tavilyApiKey = getTavilyApiKey();
 
-  return { apiKey, model: resolvedModel, fallbackModels };
+  return { apiKey, model: resolvedModel, fallbackModels, tavilyApiKey };
 }
