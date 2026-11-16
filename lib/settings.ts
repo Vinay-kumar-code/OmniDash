@@ -21,8 +21,9 @@ export function resolveModelName(model?: string | null): string {
 }
 
 export const DEFAULT_FALLBACK_MODELS = [
-  "unbiased/pareto",
-  "deepseek/deepseek-chat",
+  "baidu/ernie-5.5-flash-preview:free",
+  "google/gemma-4-31b-it:free",
+  "nvidia/nemotron-3.5-lightning:free",
   "openrouter/auto",
 ];
 

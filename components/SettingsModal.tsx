@@ -28,11 +28,11 @@ interface SettingsModalProps {
 }
 
 const PRESET_MODELS = [
-  { label: "Unbiased Pareto (200B+ Model - Recommended)", value: "unbiased/pareto" },
-  { label: "DeepSeek V3 / Chat (Fast & Accurate)", value: "deepseek/deepseek-chat" },
+  { label: "NVIDIA Nemotron 3.5 Lightning (Free - Tool Calling Verified)", value: "nvidia/nemotron-3.5-lightning:free" },
+  { label: "Google Gemma 4 31B (Free)", value: "google/gemma-4-31b-it:free" },
   { label: "OpenRouter Auto Router", value: "openrouter/auto" },
-  { label: "Llama 3.3 70B Instruct (Free)", value: "meta-llama/llama-3.3-70b-instruct:free" },
-  { label: "Llama 3.3 70B Instruct", value: "meta-llama/llama-3.3-70b-instruct" },
+  { label: "DeepSeek V3 / Chat (Fast & Accurate)", value: "deepseek/deepseek-chat" },
+  { label: "Unbiased Pareto (200B+ Model)", value: "unbiased/pareto" },
   { label: "Claude 3.5 Sonnet (Paid)", value: "anthropic/claude-3.5-sonnet" },
   { label: "GPT-4o Mini (Paid)", value: "openai/gpt-4o-mini" },
 ];

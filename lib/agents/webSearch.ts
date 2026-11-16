@@ -154,15 +154,21 @@ export async function searchWebForTopic(
   try {
     const wiki = await wikiPromise;
     if (wiki) {
-      resolvedTitle = wiki.title || resolvedTitle;
-      if (!summary) {
-        summary = wiki.extract || "";
-      }
-      if (wiki.url && !sources.some((s) => s.url === wiki.url)) {
-        sources.push({ title: `${resolvedTitle} (Wikipedia)`, url: wiki.url });
-      }
-      if (wiki.description) {
-        detectedCategory = categorizeFromDescription(wiki.description, summary);
+      // Only adopt Wikipedia title, summary, and category if it is genuinely a close match or synonym
+      const cleanWiki = (wiki.title || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const cleanTopic = trimmed.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const isWikiMatch = cleanWiki.includes(cleanTopic) || cleanTopic.includes(cleanWiki);
+      if (isWikiMatch) {
+        resolvedTitle = wiki.title;
+        if (!summary) {
+          summary = wiki.extract || "";
+        }
+        if (wiki.url && !sources.some((s) => s.url === wiki.url)) {
+          sources.push({ title: `${wiki.title || resolvedTitle} (Wikipedia)`, url: wiki.url });
+        }
+        if (wiki.description) {
+          detectedCategory = categorizeFromDescription(wiki.description, summary);
+        }
       }
     }
   } catch (err) {
@@ -542,27 +548,35 @@ async function fetchDuckDuckGoSnippets(query: string): Promise<Array<{ title: st
 
 function categorizeFromDescription(description: string, summary: string): string {
   const text = `${description} ${summary}`.toLowerCase();
-  if (/festival|celebration|observance|ritual|hindu festival|religious holiday|holiday|tradition/i.test(text)) {
+  // 1. Agriculture & Cultivation (Checked FIRST so crops with vitamins/soil nutrients aren't misclassified)
+  if (/crop|crops|cultivat|farm|farming|seed|seeds|soil|harvest|fertilizer|irrigation|yield|acre|pesticide|tomato|paddy|wheat|horticultur|agri\b|botanical/i.test(text)) {
+    return "Agriculture & Cultivation";
+  }
+  // 2. Culture & Festival
+  if (/festival|celebration|observance|ritual|hindu festival|religious holiday|holiday|tradition|puja|pooja/i.test(text)) {
     return "Culture & Festival";
   }
-  if (/video game|action-adventure game|gameplay|role-playing game|nintendo|playstation|rockstar games|esport/i.test(text)) {
+  // 3. Gaming & Entertainment
+  if (/video game|action-adventure game|gameplay|role-playing game|nintendo|playstation|rockstar games|esport|xbox/i.test(text)) {
     return "Gaming & Entertainment";
   }
-  if (/vitamin|nutrient|organic compound|biochemistry|micronutrient|retinol|carotenoid|amino acid/i.test(text)) {
+  // 4. Nutrition & Biochemistry (Only when not agricultural crops)
+  if (/retinol|rhodopsin|carotenoid|ascorbic|dietary allowance|rda|macronutrient|micronutrient|deficiency|hypervitaminosis/i.test(text)) {
     return "Nutrition & Biochemistry";
   }
+  // 5. Quantum Technology
   if (/quantum|qubit|superposition|quantum mechanics|decoherence/i.test(text)) {
     return "Quantum Technology";
   }
-  if (/crop|plant|species of|cereal|grain|agriculture|cultivation|farming|botanical/i.test(text)) {
-    return "Agriculture & Cultivation";
-  }
+  // 6. Technology & Computing
   if (/software|programming|database|framework|computing|artificial intelligence/i.test(text)) {
     return "Technology & Computing";
   }
+  // 7. History & Civilization
   if (/war|battle|empire|civilization|dynasty|treaty|historical event/i.test(text)) {
     return "History & Civilization";
   }
+  // 8. Business & Finance
   if (/company|corporation|financial|market|currency|stock/i.test(text)) {
     return "Business & Finance";
   }
@@ -571,27 +585,35 @@ function categorizeFromDescription(description: string, summary: string): string
 
 function inferCategory(topic: string, summary: string, snippets: string[]): string {
   const text = `${topic} ${summary} ${snippets.join(" ")}`.toLowerCase();
+  // 1. Agriculture & Cultivation (Top priority)
+  if (/crop|crops|cultivat|farm|farming|seed|seeds|soil|harvest|fertilizer|irrigation|yield|acre|pesticide|tomato|paddy|wheat|horticultur|agri\b|mandi|produce/i.test(text)) {
+    return "Agriculture & Cultivation";
+  }
+  // 2. Culture & Festival
   if (/festival|pooja|puja|chaviti|chaturthi|ganesh|diwali|holi|navratri|visarjan|ritual|celebration|observance/i.test(text)) {
     return "Culture & Festival";
   }
+  // 3. Gaming & Entertainment
   if (/video game|gameplay|playstation|xbox|rockstar|action-adventure|gta|franchise|rpg|multiplayer|gaming/i.test(text)) {
     return "Gaming & Entertainment";
   }
-  if (/vitamin|retinol|carotenoid|rhodopsin|nutrient|micronutrient|deficiency|supplement|bioavailability|dietary/i.test(text)) {
+  // 4. Nutrition & Biochemistry
+  if (/retinol|carotenoid|rhodopsin|macronutrient|micronutrient|deficiency|hypervitaminosis|dietary intake|rda/i.test(text)) {
     return "Nutrition & Biochemistry";
   }
+  // 5. Quantum Technology
   if (/quantum|qubit|decoherence|superposition|nisq/i.test(text)) {
     return "Quantum Technology";
   }
-  if (/crop|soil|seed|harvest|fertilizer|irrigation|cultivat|yield|acre|pesticide/i.test(text)) {
-    return "Agriculture & Cultivation";
-  }
+  // 6. Technology & Computing
   if (/software|algorithm|cloud|api|database|neural network|machine learning|framework|developer/i.test(text)) {
     return "Technology & Computing";
   }
+  // 7. History & Civilization
   if (/war|battle|revolution|republic|empire|ancient|treaty/i.test(text)) {
     return "History & Civilization";
   }
+  // 8. Business & Finance
   if (/stock|market|valuation|revenue|invest|gdp|crypto/i.test(text)) {
     return "Business & Finance";
   }
