@@ -548,35 +548,39 @@ async function fetchDuckDuckGoSnippets(query: string): Promise<Array<{ title: st
 
 function categorizeFromDescription(description: string, summary: string): string {
   const text = `${description} ${summary}`.toLowerCase();
-  // 1. Agriculture & Cultivation (Checked FIRST so crops with vitamins/soil nutrients aren't misclassified)
-  if (/crop|crops|cultivat|farm|farming|seed|seeds|soil|harvest|fertilizer|irrigation|yield|acre|pesticide|tomato|paddy|wheat|horticultur|agri\b|botanical/i.test(text)) {
-    return "Agriculture & Cultivation";
+  // 1. Consumer Electronics, Hardware & Mobile Devices (Checked before gaming to avoid misclassifying phones with gaming screens)
+  if (/\b(smartphone|phone|mobile phone|realme|xiaomi|redmi|samsung|galaxy|iphone|pixel|oneplus|oppo|vivo|motorola|snapdragon|dimensity|mediatek|display|screen|amoled|oled|camera|mah|dart charge|fast charge|ram|storage|laptop|tablet|smartwatch|earbuds|headphones|gpu|cpu|processor|gadget)\b/i.test(text)) {
+    return "Consumer Electronics & Technology";
   }
-  // 2. Culture & Festival
-  if (/festival|celebration|observance|ritual|hindu festival|religious holiday|holiday|tradition|puja|pooja/i.test(text)) {
+  // 2. Culture & Festival (Checked before agriculture so harvest festivals aren't misclassified)
+  if (/\b(festival|celebration|observance|ritual|hindu festival|religious holiday|holiday|tradition|puja|pooja|chaviti|chaturthi|ganesh|diwali|holi|navratri|visarjan|durga puja|onam|pongal|eid|christmas)\b/i.test(text)) {
     return "Culture & Festival";
   }
-  // 3. Gaming & Entertainment
-  if (/video game|action-adventure game|gameplay|role-playing game|nintendo|playstation|rockstar games|esport|xbox/i.test(text)) {
+  // 3. Agriculture & Cultivation
+  if (/\b(crop|crops|cultivat|farm|farming|seed|seeds|soil|harvest|fertilizer|irrigation|yield|acre|pesticide|tomato|paddy|wheat|horticultur|agri\b|mandi|produce|botanical)\b/i.test(text)) {
+    return "Agriculture & Cultivation";
+  }
+  // 4. Gaming & Interactive Entertainment (Strict game title/gameplay keywords)
+  if (/\b(video game|action-adventure game|gameplay|role-playing game|rpg game|fps game|rockstar games|esport|nintendo switch|playstation exclusive|xbox series|gta\b|grand theft auto|stealth game|game studio)\b/i.test(text)) {
     return "Gaming & Entertainment";
   }
-  // 4. Nutrition & Biochemistry (Only when not agricultural crops)
-  if (/retinol|rhodopsin|carotenoid|ascorbic|dietary allowance|rda|macronutrient|micronutrient|deficiency|hypervitaminosis/i.test(text)) {
+  // 5. Nutrition & Biochemistry (Only when not agricultural crops)
+  if (/\b(retinol|rhodopsin|carotenoid|ascorbic|dietary allowance|rda|macronutrient|micronutrient|deficiency|hypervitaminosis|vitamin [a-z]|nutritional requirement)\b/i.test(text)) {
     return "Nutrition & Biochemistry";
   }
-  // 5. Quantum Technology
-  if (/quantum|qubit|superposition|quantum mechanics|decoherence/i.test(text)) {
+  // 6. Quantum Technology
+  if (/quantum|qubit|superposition|quantum mechanics|decoherence|nisq/i.test(text)) {
     return "Quantum Technology";
   }
-  // 6. Technology & Computing
-  if (/software|programming|database|framework|computing|artificial intelligence/i.test(text)) {
+  // 7. Technology & Computing
+  if (/software|programming|database|framework|computing|artificial intelligence|algorithm|cloud|api|neural network/i.test(text)) {
     return "Technology & Computing";
   }
-  // 7. History & Civilization
+  // 8. History & Civilization
   if (/war|battle|empire|civilization|dynasty|treaty|historical event/i.test(text)) {
     return "History & Civilization";
   }
-  // 8. Business & Finance
+  // 9. Business & Finance
   if (/company|corporation|financial|market|currency|stock/i.test(text)) {
     return "Business & Finance";
   }
@@ -585,35 +589,39 @@ function categorizeFromDescription(description: string, summary: string): string
 
 function inferCategory(topic: string, summary: string, snippets: string[]): string {
   const text = `${topic} ${summary} ${snippets.join(" ")}`.toLowerCase();
-  // 1. Agriculture & Cultivation (Top priority)
-  if (/crop|crops|cultivat|farm|farming|seed|seeds|soil|harvest|fertilizer|irrigation|yield|acre|pesticide|tomato|paddy|wheat|horticultur|agri\b|mandi|produce/i.test(text)) {
-    return "Agriculture & Cultivation";
+  // 1. Consumer Electronics, Hardware & Mobile Devices (Checked before gaming)
+  if (/\b(smartphone|phone|mobile phone|realme|xiaomi|redmi|samsung|galaxy|iphone|pixel|oneplus|oppo|vivo|motorola|snapdragon|dimensity|mediatek|display|screen|amoled|oled|camera|mah|dart charge|fast charge|ram|storage|laptop|tablet|smartwatch|earbuds|headphones|gpu|cpu|processor|gadget)\b/i.test(text)) {
+    return "Consumer Electronics & Technology";
   }
-  // 2. Culture & Festival
-  if (/festival|pooja|puja|chaviti|chaturthi|ganesh|diwali|holi|navratri|visarjan|ritual|celebration|observance/i.test(text)) {
+  // 2. Culture & Festival (Checked before agriculture)
+  if (/\b(festival|pooja|puja|chaviti|chaturthi|ganesh|diwali|holi|navratri|visarjan|ritual|celebration|observance|durga puja|onam|pongal|eid|christmas)\b/i.test(text)) {
     return "Culture & Festival";
   }
-  // 3. Gaming & Entertainment
-  if (/video game|gameplay|playstation|xbox|rockstar|action-adventure|gta|franchise|rpg|multiplayer|gaming/i.test(text)) {
+  // 3. Agriculture & Cultivation
+  if (/\b(crop|crops|cultivat|farm|farming|seed|seeds|soil|harvest|fertilizer|irrigation|yield|acre|pesticide|tomato|paddy|wheat|horticultur|agri\b|mandi|produce)\b/i.test(text)) {
+    return "Agriculture & Cultivation";
+  }
+  // 4. Gaming & Interactive Entertainment (Strict game title/gameplay keywords)
+  if (/\b(video game|action-adventure game|gameplay|role-playing game|rpg game|fps game|rockstar games|esport|nintendo switch|playstation exclusive|xbox series|gta\b|grand theft auto|stealth game|game studio)\b/i.test(text)) {
     return "Gaming & Entertainment";
   }
-  // 4. Nutrition & Biochemistry
-  if (/retinol|carotenoid|rhodopsin|macronutrient|micronutrient|deficiency|hypervitaminosis|dietary intake|rda/i.test(text)) {
+  // 5. Nutrition & Biochemistry
+  if (/\b(retinol|carotenoid|rhodopsin|ascorbic|macronutrient|micronutrient|deficiency|hypervitaminosis|dietary intake|rda|vitamin [a-z]|nutritional requirement)\b/i.test(text)) {
     return "Nutrition & Biochemistry";
   }
-  // 5. Quantum Technology
+  // 6. Quantum Technology
   if (/quantum|qubit|decoherence|superposition|nisq/i.test(text)) {
     return "Quantum Technology";
   }
-  // 6. Technology & Computing
+  // 7. Technology & Computing
   if (/software|algorithm|cloud|api|database|neural network|machine learning|framework|developer/i.test(text)) {
     return "Technology & Computing";
   }
-  // 7. History & Civilization
+  // 8. History & Civilization
   if (/war|battle|revolution|republic|empire|ancient|treaty/i.test(text)) {
     return "History & Civilization";
   }
-  // 8. Business & Finance
+  // 9. Business & Finance
   if (/stock|market|valuation|revenue|invest|gdp|crypto/i.test(text)) {
     return "Business & Finance";
   }

@@ -21,9 +21,11 @@ export function resolveModelName(model?: string | null): string {
 }
 
 export const DEFAULT_FALLBACK_MODELS = [
+  "openrouter/free",
   "baidu/ernie-5.5-flash-preview:free",
-  "google/gemma-4-31b-it:free",
   "nvidia/nemotron-3.5-lightning:free",
+  "inclusionai/ling-3.2-flash:free",
+  "google/gemma-4-31b-it:free",
   "openrouter/auto",
 ];
 
