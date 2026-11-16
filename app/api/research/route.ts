@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { topic, fileId } = body;
+    const { topic, fileId, fastTrack } = body;
 
     if (!topic || typeof topic !== "string" || !topic.trim()) {
       return NextResponse.json({ error: "Topic is required" }, { status: 400 });
@@ -56,16 +56,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Spawn 3 parallel live agents for fast multi-agent research with web grounding
-    const swarmResult = await executeResearchSwarm(trimmedTopic, fileText, {
-      apiKey,
-      model,
-      fallbackModels,
-      tavilyApiKey,
-      braveApiKey,
-      firecrawlApiKey,
-      searchProvider,
-    });
+    // Spawn autonomous research agent with web grounding and fallback cascade
+    const swarmResult = await executeResearchSwarm(
+      trimmedTopic,
+      fileText,
+      {
+        apiKey,
+        model,
+        fallbackModels,
+        tavilyApiKey,
+        braveApiKey,
+        firecrawlApiKey,
+        searchProvider,
+      },
+      Boolean(fastTrack)
+    );
 
     const finalResearchJson = JSON.stringify(swarmResult.data);
 

@@ -92,12 +92,33 @@ export default function SearchBox({ fileId, selectedTopic }: SearchBoxProps) {
     ]);
 
     try {
-      // Step 1: Execute Web Research + 3-Agent Parallel Research Swarm
-      const researchRes = await fetch("/api/research", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic: topic.trim(), fileId }),
-      });
+      // Step 1: Execute Web Research + Autonomous Research Swarm
+      let researchRes: Response;
+      try {
+        researchRes = await fetch("/api/research", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ topic: topic.trim(), fileId }),
+        });
+      } catch (fetchErr) {
+        // Network error / connection drop: auto-recover with fast-track
+        console.warn("Primary research request failed, recovering with fast-track...");
+        researchRes = await fetch("/api/research", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ topic: topic.trim(), fileId, fastTrack: true }),
+        });
+      }
+
+      // If gateway timed out with 504 / 502, automatically recover with fast-track
+      if (researchRes.status === 504 || researchRes.status === 502) {
+        console.warn(`Gateway HTTP ${researchRes.status} received. Auto-recovering with fast-track mode...`);
+        researchRes = await fetch("/api/research", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ topic: topic.trim(), fileId, fastTrack: true }),
+        });
+      }
 
       const researchData = await parseSafeResponse(researchRes, "Research Swarm");
 

@@ -144,8 +144,9 @@ async function runIterativeResearchAgent(
   model: string,
   initialWeb: WebResearchResult,
   searchConfig: SearchCredentials,
-  maxSearchRounds = 2
+  budgetMs = 22000
 ): Promise<{ data: CompleteResearchData; toolCallsExecuted: number }> {
+  const agentStartTime = Date.now();
   const accumulatedSnippets: string[] = [...initialWeb.snippets];
   const accumulatedSources: Array<{ title: string; url: string }> = [...initialWeb.sources];
 
@@ -198,62 +199,70 @@ Use 'search_web' to investigate specific details, production figures, regional b
 
   let toolCallsExecuted = 0;
 
-  // Phase 1: Interactive Tool Calling Research Rounds
-  for (let round = 0; round < maxSearchRounds; round++) {
-    console.log(`[ResearchAgent] Research Round ${round + 1}/${maxSearchRounds} with model: ${model}`);
+  // Phase 1: Interactive Tool Calling Research Rounds (budget-aware)
+  const round1Budget = Math.max(4000, Math.floor((budgetMs - (Date.now() - agentStartTime)) / 2));
+  console.log(`[ResearchAgent] Research Round 1 with model: ${model} (budget: ${round1Budget}ms)`);
 
-    let completion: OpenAI.Chat.ChatCompletion;
-    try {
-      completion = await openai.chat.completions.create({
+  let completion: OpenAI.Chat.ChatCompletion | null = null;
+  try {
+    completion = await openai.chat.completions.create(
+      {
         model: model,
         messages: messages,
         tools: tools,
         tool_choice: "auto",
         temperature: 0.2,
-        max_tokens: 2000,
-      });
-    } catch (err: any) {
-      console.warn(`[ResearchAgent] Round ${round + 1} call error:`, err?.message);
-      break;
-    }
+        max_tokens: 1500,
+      },
+      { timeout: round1Budget }
+    );
+  } catch (err: any) {
+    console.warn(`[ResearchAgent] Round 1 call error or timeout:`, err?.message);
+  }
 
-    const msg = completion.choices[0]?.message;
-    if (!msg) break;
+  const msg = completion?.choices[0]?.message;
 
-    // Check for native function calls
-    if (msg.tool_calls && msg.tool_calls.length > 0) {
-      messages.push(msg);
-      for (const tc of msg.tool_calls) {
-        if (tc.type === "function" && tc.function.name === "search_web") {
-          toolCallsExecuted++;
-          let query = topic;
-          try {
-            const args = JSON.parse(tc.function.arguments || "{}");
-            query = args.query || topic;
-          } catch {}
+  // Check for native function calls
+  if (msg?.tool_calls && msg.tool_calls.length > 0) {
+    messages.push(msg);
 
-          console.log(`[ResearchAgent] Round ${round + 1}: Executing native search_web("${query}")`);
-          const searchRes = await searchWebForTopic(query, searchConfig);
-          for (const s of searchRes.snippets) accumulatedSnippets.push(s);
-          for (const src of searchRes.sources) {
-            if (!accumulatedSources.some((x) => x.url === src.url)) accumulatedSources.push(src);
-          }
+    // Execute all tool calls in parallel with Promise.all for low latency
+    const searchTasks = msg.tool_calls.map(async (tc) => {
+      if (tc.type === "function" && tc.function.name === "search_web") {
+        let query = topic;
+        try {
+          const args = JSON.parse(tc.function.arguments || "{}");
+          query = args.query || topic;
+        } catch {}
 
-          const formattedResult =
-            searchRes.snippets.length > 0
-              ? searchRes.snippets.map((s, i) => `[Fact ${i + 1}] ${s}`).join("\n")
-              : "No additional live search results found.";
-
-          messages.push({
-            role: "tool",
-            tool_call_id: tc.id,
-            content: formattedResult,
-          });
-        }
+        console.log(`[ResearchAgent] Executing native parallel search_web("${query}")`);
+        const searchRes = await searchWebForTopic(query, searchConfig);
+        return { tc, query, searchRes };
       }
-      continue;
-    }
+      return null;
+    });
 
+    const results = await Promise.all(searchTasks);
+    for (const res of results) {
+      if (!res) continue;
+      toolCallsExecuted++;
+      for (const s of res.searchRes.snippets) accumulatedSnippets.push(s);
+      for (const src of res.searchRes.sources) {
+        if (!accumulatedSources.some((x) => x.url === src.url)) accumulatedSources.push(src);
+      }
+
+      const formattedResult =
+        res.searchRes.snippets.length > 0
+          ? res.searchRes.snippets.map((s, i) => `[Fact ${i + 1}] ${s}`).join("\n")
+          : "No additional live search results found.";
+
+      messages.push({
+        role: "tool",
+        tool_call_id: res.tc.id,
+        content: formattedResult,
+      });
+    }
+  } else if (msg?.content) {
     // Check for text-based tool calls (e.g. <function=search_web>)
     const content = msg.content || "";
     const textToolMatch =
@@ -263,7 +272,7 @@ Use 'search_web' to investigate specific details, production figures, regional b
     if (textToolMatch) {
       toolCallsExecuted++;
       const query = textToolMatch[1].trim().replace(/^["'{]\s*query["']?\s*:\s*["']?|["'}]+$/g, "");
-      console.log(`[ResearchAgent] Round ${round + 1}: Executing text-based search_web("${query}")`);
+      console.log(`[ResearchAgent] Executing text-based search_web("${query}")`);
       const searchRes = await searchWebForTopic(query, searchConfig);
       for (const s of searchRes.snippets) accumulatedSnippets.push(s);
       for (const src of searchRes.sources) {
@@ -277,19 +286,18 @@ Use 'search_web' to investigate specific details, production figures, regional b
 
       messages.push({ role: "assistant", content });
       messages.push({
-        role: "user",
+        role: "tool",
+        tool_call_id: "call_text_search",
         content: `Search Results for "${query}":\n${formattedResult}`,
       });
-      continue;
+    } else {
+      messages.push(msg);
     }
-
-    // If model didn't call any tools, break out of search rounds into synthesis
-    messages.push(msg);
-    break;
   }
 
   // Phase 2: Explicit Synthesis Phase
-  console.log(`[ResearchAgent] Entering Synthesis Phase with model: ${model} (${toolCallsExecuted} tool calls executed)`);
+  const synthesisBudget = Math.max(6000, budgetMs - (Date.now() - agentStartTime));
+  console.log(`[ResearchAgent] Entering Synthesis Phase with model: ${model} (${toolCallsExecuted} tool calls, budget: ${synthesisBudget}ms)`);
 
   const synthesisPrompt = `You have gathered all necessary live web intelligence. Now synthesize ALL facts into the visual intelligence dashboard JSON for: "${topic}".
 
@@ -348,31 +356,38 @@ DO NOT include conversational chatter or explanations outside the json codeblock
     content: synthesisPrompt,
   });
 
-  let synthesisRes = await openai.chat.completions.create({
-    model: model,
-    messages: messages,
-    temperature: 0.2,
-    max_tokens: 3800,
-  });
+  let synthesisRes = await openai.chat.completions.create(
+    {
+      model: model,
+      messages: messages,
+      temperature: 0.2,
+      max_tokens: 2800,
+    },
+    { timeout: synthesisBudget }
+  );
 
   let rawContent = synthesisRes.choices[0]?.message?.content || "";
   let parsed = extractCleanJson(rawContent);
 
-  // If initial parse fails, perform one direct repair attempt
-  if (!parsed || !Array.isArray(parsed.key_metrics) || parsed.key_metrics.length === 0) {
-    console.log(`[ResearchAgent] Initial JSON parse failed or incomplete. Performing repair turn...`);
+  // If initial parse fails and we still have budget, perform one quick repair attempt
+  const remainingAfterSynthesis = budgetMs - (Date.now() - agentStartTime);
+  if ((!parsed || !Array.isArray(parsed.key_metrics) || parsed.key_metrics.length === 0) && remainingAfterSynthesis > 4000) {
+    console.log(`[ResearchAgent] Initial JSON parse failed or incomplete. Performing quick repair turn (${remainingAfterSynthesis}ms left)...`);
     messages.push({ role: "assistant", content: rawContent });
     messages.push({
       role: "user",
       content: "The previous output was not valid JSON or was missing key_metrics. Please output ONLY the raw JSON object inside ```json ... ``` without any extra text.",
     });
 
-    synthesisRes = await openai.chat.completions.create({
-      model: model,
-      messages: messages,
-      temperature: 0.1,
-      max_tokens: 3800,
-    });
+    synthesisRes = await openai.chat.completions.create(
+      {
+        model: model,
+        messages: messages,
+        temperature: 0.1,
+        max_tokens: 2800,
+      },
+      { timeout: remainingAfterSynthesis }
+    );
     rawContent = synthesisRes.choices[0]?.message?.content || "";
     parsed = extractCleanJson(rawContent);
   }
@@ -734,10 +749,12 @@ export async function executeResearchSwarm(
     braveApiKey?: string;
     firecrawlApiKey?: string;
     searchProvider?: string;
-  }
+  },
+  fastTrack = false
 ): Promise<SwarmResult> {
   const startTime = Date.now();
   const trimmedTopic = topic.trim();
+  const SWARM_DEADLINE_MS = 38000; // 38s deadline to guarantee response before proxy 504
 
   const searchConfig: SearchCredentials = {
     tavilyApiKey: config.tavilyApiKey,
@@ -768,59 +785,73 @@ export async function executeResearchSwarm(
     };
   }
 
-  // Step 2: Initialize OpenAI client for OpenRouter
-  const openai = new OpenAI({
-    baseURL: "https://openrouter.ai/api/v1",
-    apiKey: config.apiKey,
-    timeout: 60000,
-    maxRetries: 0,
-  });
-
-  // Candidate models: User model -> User fallbacks -> Verified free tool-calling models
-  const candidateModels = Array.from(
-    new Set([
-      resolveModelName(config.model),
-      ...(config.fallbackModels || []).map((m) => resolveModelName(m)),
-      "baidu/ernie-5.5-flash-preview:free",
-      "google/gemma-4-31b-it:free",
-      "nvidia/nemotron-3.5-lightning:free",
-      "openrouter/auto",
-    ])
-  ).filter(Boolean);
-
-  console.log(
-    `[ResearchSwarm] Step 2: Running Autonomous Agent with Tool-Calling Loops. Models: [${candidateModels.join(", ")}]`
-  );
-
   let finalData: CompleteResearchData | null = null;
   let modelUsed = "";
   let toolCallsCount = 0;
 
-  for (const candidate of candidateModels) {
-    try {
-      console.log(`[ResearchSwarm] Attempting candidate model: ${candidate}`);
-      const agentResult = await runIterativeResearchAgent(
-        trimmedTopic,
-        contextText,
-        openai,
-        candidate,
-        webResearch,
-        searchConfig,
-        2
-      );
+  // If fast-track mode is explicitly requested, build directly from verified search
+  if (fastTrack) {
+    console.log(`[ResearchSwarm] Fast-track mode active: synthesizing directly from verified search evidence.`);
+    finalData = buildDynamicWebFallback(trimmedTopic, webResearch);
+  } else {
+    // Step 2: Initialize OpenAI client with strict 25s timeout
+    const openai = new OpenAI({
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: config.apiKey,
+      timeout: 25000,
+      maxRetries: 0,
+    });
 
-      if (agentResult && agentResult.data) {
-        finalData = agentResult.data;
-        toolCallsCount = agentResult.toolCallsExecuted;
-        modelUsed = candidate;
-        console.log(
-          `[ResearchSwarm] Model ${candidate} succeeded! Executed ${toolCallsCount} live tool calls.`
-        );
+    // Candidate models: User model -> User fallbacks -> Verified free tool-calling models
+    const candidateModels = Array.from(
+      new Set([
+        resolveModelName(config.model),
+        ...(config.fallbackModels || []).map((m) => resolveModelName(m)),
+        "baidu/ernie-5.5-flash-preview:free",
+        "google/gemma-4-31b-it:free",
+        "nvidia/nemotron-3.5-lightning:free",
+        "openrouter/auto",
+      ])
+    ).filter(Boolean);
+
+    console.log(
+      `[ResearchSwarm] Step 2: Running Autonomous Agent with Tool-Calling Loops. Models: [${candidateModels.join(", ")}]`
+    );
+
+    let candidateAttempts = 0;
+    for (const candidate of candidateModels) {
+      const elapsed = Date.now() - startTime;
+      if (elapsed > SWARM_DEADLINE_MS || candidateAttempts >= 2) {
+        console.warn(`[ResearchSwarm] Swarm deadline or attempt cap reached (${elapsed}ms, ${candidateAttempts} attempts). Finalizing immediately with verified dynamic fallback.`);
         break;
       }
-    } catch (err: any) {
-      console.warn(`[ResearchSwarm] Model "${candidate}" failed (${err?.status || err?.message}). Trying next candidate...`);
-      // If the error was a credit/limit error on a paid model, keep trying free models!
+      candidateAttempts++;
+
+      try {
+        const remainingBudget = Math.max(6000, SWARM_DEADLINE_MS - (Date.now() - startTime));
+        console.log(`[ResearchSwarm] Attempting candidate model: ${candidate} (budget: ${remainingBudget}ms)`);
+        const agentResult = await runIterativeResearchAgent(
+          trimmedTopic,
+          contextText,
+          openai,
+          candidate,
+          webResearch,
+          searchConfig,
+          remainingBudget
+        );
+
+        if (agentResult && agentResult.data) {
+          finalData = agentResult.data;
+          toolCallsCount = agentResult.toolCallsExecuted;
+          modelUsed = candidate;
+          console.log(
+            `[ResearchSwarm] Model ${candidate} succeeded! Executed ${toolCallsCount} live tool calls.`
+          );
+          break;
+        }
+      } catch (err: any) {
+        console.warn(`[ResearchSwarm] Model "${candidate}" failed (${err?.status || err?.message}). Trying next candidate...`);
+      }
     }
   }
 
