@@ -1,9 +1,22 @@
 /**
- * Web Research Agent: Fetches real-time web intelligence from Wikipedia and search engines.
+ * Web Research Agent: Fetches real-time web intelligence from Tavily, Brave Search,
+ * Firecrawl, Wikipedia, and DuckDuckGo.
  * Supplies ground-truth facts, statistics, historical dates, and sources for ANY topic.
  */
 
-import { getTavilyApiKey } from "../settings";
+import {
+  getTavilyApiKey,
+  getBraveApiKey,
+  getFirecrawlApiKey,
+  getSearchProviderPreference,
+} from "../settings";
+
+export interface SearchCredentials {
+  tavilyApiKey?: string;
+  braveApiKey?: string;
+  firecrawlApiKey?: string;
+  searchProvider?: string;
+}
 
 export interface WebResearchResult {
   topic: string;
@@ -13,16 +26,16 @@ export interface WebResearchResult {
   sources: Array<{ title: string; url: string }>;
   detectedCategory: string;
   groundedFacts: string;
-  engineUsed: "tavily" | "wikipedia_ddg";
+  engineUsed: "tavily" | "brave" | "firecrawl" | "wikipedia_ddg";
 }
 
 /**
- * Searches real-time web intelligence using Tavily Search API as primary engine,
- * with resilient Wikipedia and DuckDuckGo fallbacks.
+ * Searches real-time web intelligence using configured search providers
+ * (Tavily, Brave Search, Firecrawl) with resilient Wikipedia and DuckDuckGo fallbacks.
  */
 export async function searchWebForTopic(
   topic: string,
-  providedTavilyKey?: string
+  credentialsOrTavilyKey?: string | SearchCredentials
 ): Promise<WebResearchResult> {
   const trimmed = topic.trim();
   const sources: Array<{ title: string; url: string }> = [];
@@ -30,7 +43,17 @@ export async function searchWebForTopic(
   let summary = "";
   let resolvedTitle = trimmed;
   let detectedCategory = "General Knowledge";
-  let engineUsed: "tavily" | "wikipedia_ddg" = "wikipedia_ddg";
+  let engineUsed: "tavily" | "brave" | "firecrawl" | "wikipedia_ddg" = "wikipedia_ddg";
+
+  const creds: SearchCredentials =
+    typeof credentialsOrTavilyKey === "string"
+      ? { tavilyApiKey: credentialsOrTavilyKey }
+      : (credentialsOrTavilyKey || {});
+
+  const tavilyKey = (creds.tavilyApiKey || getTavilyApiKey()).trim();
+  const braveKey = (creds.braveApiKey || getBraveApiKey()).trim();
+  const firecrawlKey = (creds.firecrawlApiKey || getFirecrawlApiKey()).trim();
+  const preferredEngine = (creds.searchProvider || getSearchProviderPreference() || "auto").trim().toLowerCase();
 
   // Build query variants for specific terms (e.g. festivals)
   const queriesToTry: string[] = [];
@@ -40,34 +63,97 @@ export async function searchWebForTopic(
     queriesToTry.push(trimmed);
   }
 
-  const tavilyKey = (providedTavilyKey || getTavilyApiKey()).trim();
+  // Pre-fetch Wikipedia encyclopedic summary concurrently
+  const wikiPromise = fetchWikipediaData(queriesToTry);
 
-  // 1. If Tavily API Key is available, use Tavily AI Search as primary
-  if (tavilyKey) {
+  // Strategy 1: Explicit engine selection or Auto cascaded execution
+  let searchEngineRan = false;
+
+  // 1A. Brave Search (if preferred or Auto without Tavily)
+  if (
+    (preferredEngine === "brave" && braveKey) ||
+    (preferredEngine === "auto" && !tavilyKey && braveKey)
+  ) {
+    console.log(`[WebResearchAgent] Querying Brave Search API for "${trimmed}"...`);
+    const braveResult = await fetchBraveSearch(trimmed, braveKey);
+    if (braveResult && braveResult.snippets.length > 0) {
+      engineUsed = "brave";
+      searchEngineRan = true;
+      for (const snip of braveResult.snippets) snippets.push(snip);
+      for (const src of braveResult.sources) {
+        if (!sources.some((s) => s.url === src.url)) sources.push(src);
+      }
+    }
+  }
+
+  // 1B. Firecrawl Search (if preferred or Auto without Tavily/Brave)
+  if (
+    !searchEngineRan &&
+    ((preferredEngine === "firecrawl" && firecrawlKey) ||
+      (preferredEngine === "auto" && !tavilyKey && !braveKey && firecrawlKey))
+  ) {
+    console.log(`[WebResearchAgent] Querying Firecrawl API for "${trimmed}"...`);
+    const firecrawlResult = await fetchFirecrawlSearch(trimmed, firecrawlKey);
+    if (firecrawlResult && firecrawlResult.snippets.length > 0) {
+      engineUsed = "firecrawl";
+      searchEngineRan = true;
+      for (const snip of firecrawlResult.snippets) snippets.push(snip);
+      for (const src of firecrawlResult.sources) {
+        if (!sources.some((s) => s.url === src.url)) sources.push(src);
+      }
+    }
+  }
+
+  // 1C. Tavily Search (if preferred or Auto default when key available)
+  if (!searchEngineRan && (preferredEngine === "tavily" || preferredEngine === "auto") && tavilyKey) {
     console.log(`[WebResearchAgent] Querying Tavily AI Search for "${trimmed}"...`);
-    const [tavilyResult, wikiResult] = await Promise.allSettled([
-      fetchTavilySearch(trimmed, tavilyKey),
-      fetchWikipediaData(queriesToTry),
-    ]);
-
-    if (tavilyResult.status === "fulfilled" && tavilyResult.value) {
-      const tav = tavilyResult.value;
+    const tavilyResult = await fetchTavilySearch(trimmed, tavilyKey);
+    if (tavilyResult && (tavilyResult.snippets.length > 0 || tavilyResult.answer)) {
       engineUsed = "tavily";
-      if (tav.answer) {
-        summary = tav.answer;
+      searchEngineRan = true;
+      if (tavilyResult.answer) {
+        summary = tavilyResult.answer;
       }
-      for (const snip of tav.snippets) {
-        snippets.push(snip);
+      for (const snip of tavilyResult.snippets) snippets.push(snip);
+      for (const src of tavilyResult.sources) {
+        if (!sources.some((s) => s.url === src.url)) sources.push(src);
       }
-      for (const src of tav.sources) {
-        if (!sources.some((s) => s.url === src.url)) {
-          sources.push(src);
+    }
+  }
+
+  // 1D. Cascaded fallback to any other configured keys if primary yielded nothing
+  if (!searchEngineRan) {
+    if (braveKey && preferredEngine !== "brave") {
+      console.log(`[WebResearchAgent] Cascading to Brave Search for "${trimmed}"...`);
+      const braveResult = await fetchBraveSearch(trimmed, braveKey);
+      if (braveResult && braveResult.snippets.length > 0) {
+        engineUsed = "brave";
+        searchEngineRan = true;
+        for (const snip of braveResult.snippets) snippets.push(snip);
+        for (const src of braveResult.sources) {
+          if (!sources.some((s) => s.url === src.url)) sources.push(src);
         }
       }
     }
 
-    if (wikiResult.status === "fulfilled" && wikiResult.value) {
-      const wiki = wikiResult.value;
+    if (!searchEngineRan && firecrawlKey && preferredEngine !== "firecrawl") {
+      console.log(`[WebResearchAgent] Cascading to Firecrawl Search for "${trimmed}"...`);
+      const firecrawlResult = await fetchFirecrawlSearch(trimmed, firecrawlKey);
+      if (firecrawlResult && firecrawlResult.snippets.length > 0) {
+        engineUsed = "firecrawl";
+        searchEngineRan = true;
+        for (const snip of firecrawlResult.snippets) snippets.push(snip);
+        for (const src of firecrawlResult.sources) {
+          if (!sources.some((s) => s.url === src.url)) sources.push(src);
+        }
+      }
+    }
+  }
+
+  // Await Wikipedia result to enrich definitions and canonical metadata
+  try {
+    const wiki = await wikiPromise;
+    if (wiki) {
       resolvedTitle = wiki.title || resolvedTitle;
       if (!summary) {
         summary = wiki.extract || "";
@@ -79,35 +165,24 @@ export async function searchWebForTopic(
         detectedCategory = categorizeFromDescription(wiki.description, summary);
       }
     }
+  } catch (err) {
+    console.warn("[WebResearchAgent] Wikipedia lookup warning:", err);
   }
 
-  // 2. Fallback to Wikipedia + DuckDuckGo if Tavily was not used or yielded no snippets
+  // 2. Final Fallback: Wikipedia + DuckDuckGo if no external engine provided snippets
   if (snippets.length === 0) {
-    console.log(`[WebResearchAgent] Running Wikipedia & DuckDuckGo search fallback for "${trimmed}"...`);
-    const [wikiResult, ddgResult] = await Promise.allSettled([
-      summary ? Promise.resolve(null) : fetchWikipediaData(queriesToTry),
-      fetchDuckDuckGoSnippets(trimmed),
-    ]);
-
-    if (wikiResult.status === "fulfilled" && wikiResult.value) {
-      const wiki = wikiResult.value;
-      resolvedTitle = wiki.title || resolvedTitle;
-      if (!summary) summary = wiki.extract || "";
-      if (wiki.description) {
-        detectedCategory = categorizeFromDescription(wiki.description, summary);
-      }
-      if (wiki.url && !sources.some((s) => s.url === wiki.url)) {
-        sources.push({ title: `${resolvedTitle} (Wikipedia)`, url: wiki.url });
-      }
-    }
-
-    if (ddgResult.status === "fulfilled" && ddgResult.value) {
-      for (const item of ddgResult.value) {
+    console.log(`[WebResearchAgent] Falling back to DuckDuckGo search for "${trimmed}"...`);
+    engineUsed = "wikipedia_ddg";
+    try {
+      const ddgResult = await fetchDuckDuckGoSnippets(trimmed);
+      for (const item of ddgResult) {
         if (item.snippet) snippets.push(item.snippet);
         if (item.url && !sources.some((s) => s.url === item.url)) {
           sources.push({ title: item.title || `${trimmed} Resource`, url: item.url });
         }
       }
+    } catch (err) {
+      console.warn("[WebResearchAgent] DuckDuckGo search error:", err);
     }
   }
 
@@ -127,7 +202,7 @@ export async function searchWebForTopic(
     factsList.push(`Executive Overview & Synthesis:\n${summary}`);
   }
   if (snippets.length > 0) {
-    factsList.push(`Verified Web Facts & Evidence Points:\n- ${snippets.slice(0, 7).join("\n- ")}`);
+    factsList.push(`Verified Web Facts & Evidence Points:\n- ${snippets.slice(0, 8).join("\n- ")}`);
   }
 
   return {
@@ -135,13 +210,152 @@ export async function searchWebForTopic(
     title: resolvedTitle,
     summary,
     snippets,
-    sources: sources.slice(0, 5),
+    sources: sources.slice(0, 6),
     detectedCategory,
     groundedFacts: factsList.join("\n\n"),
     engineUsed,
   };
 }
 
+/**
+ * Brave Search API: Real-time search across global web index.
+ */
+async function fetchBraveSearch(
+  topic: string,
+  apiKey: string
+): Promise<{
+  snippets: string[];
+  sources: Array<{ title: string; url: string }>;
+} | null> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 9000);
+
+    const query = `${topic} overview details facts`;
+    const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=7&result_filter=web`;
+
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "X-Subscription-Token": apiKey,
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      console.warn(`[Brave Search] API returned HTTP ${res.status}: ${errText.slice(0, 200)}`);
+      return null;
+    }
+
+    const data = await res.json();
+    const snippets: string[] = [];
+    const sources: Array<{ title: string; url: string }> = [];
+
+    const results = data.web?.results;
+    if (Array.isArray(results)) {
+      for (const item of results) {
+        if (item.description && item.description.trim().length > 30) {
+          snippets.push(unescapeHtml(item.description.trim()));
+        }
+        if (Array.isArray(item.extra_snippets)) {
+          for (const extra of item.extra_snippets) {
+            if (typeof extra === "string" && extra.trim().length > 30) {
+              snippets.push(unescapeHtml(extra.trim()));
+            }
+          }
+        }
+        if (item.url && !sources.some((s) => s.url === item.url)) {
+          sources.push({
+            title: unescapeHtml(item.title || `${topic} Source`),
+            url: item.url,
+          });
+        }
+      }
+    }
+
+    return { snippets, sources };
+  } catch (err: any) {
+    console.warn("[Brave Search Error]:", err?.message);
+    return null;
+  }
+}
+
+/**
+ * Firecrawl API: Deep search and web scraping for factual extraction.
+ */
+async function fetchFirecrawlSearch(
+  topic: string,
+  apiKey: string
+): Promise<{
+  snippets: string[];
+  sources: Array<{ title: string; url: string }>;
+} | null> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12000);
+
+    const res = await fetch("https://api.firecrawl.dev/v1/search", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        query: `${topic} overview key facts guide`,
+        limit: 5,
+        scrapeOptions: {
+          formats: ["markdown"],
+        },
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      console.warn(`[Firecrawl Search] API returned HTTP ${res.status}: ${errText.slice(0, 200)}`);
+      return null;
+    }
+
+    const data = await res.json();
+    const snippets: string[] = [];
+    const sources: Array<{ title: string; url: string }> = [];
+
+    const items = data.data || data.results;
+    if (Array.isArray(items)) {
+      for (const item of items) {
+        if (item.description && item.description.trim().length > 30) {
+          snippets.push(unescapeHtml(item.description.trim()));
+        } else if (item.markdown && item.markdown.trim().length > 40) {
+          const cleanMd = item.markdown
+            .replace(/[#*`_\[\]()]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+          snippets.push(cleanMd.slice(0, 280));
+        }
+
+        if (item.url && !sources.some((s) => s.url === item.url)) {
+          sources.push({
+            title: unescapeHtml(item.title || `${topic} Source`),
+            url: item.url,
+          });
+        }
+      }
+    }
+
+    return { snippets, sources };
+  } catch (err: any) {
+    console.warn("[Firecrawl Search Error]:", err?.message);
+    return null;
+  }
+}
+
+/**
+ * Tavily AI Search: Specialized agentic deep research engine.
+ */
 async function fetchTavilySearch(
   topic: string,
   apiKey: string
@@ -239,7 +453,6 @@ async function fetchWikipediaData(queries: string[]): Promise<{
 } | null> {
   for (const q of queries) {
     try {
-      // 1. Direct page summary lookup
       const summaryUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(
         q.replace(/\s+/g, "_")
       )}`;
@@ -249,124 +462,76 @@ async function fetchWikipediaData(queries: string[]): Promise<{
 
       if (res.ok) {
         const data = await res.json();
-        const isFilmOrDisambig =
-          data.type === "disambiguation" ||
-          (data.description && /film|soundtrack|album|movie|actor|actress/i.test(data.description) && !/film|movie/i.test(q)) ||
-          (data.extract && /directed by|written and directed|stars N\. T\. Rama Rao|soundtrack/i.test(data.extract) && !/film|movie/i.test(q));
-
-        if (!isFilmOrDisambig && data.extract && data.extract.length > 80) {
+        if (data.type === "standard" && data.extract) {
           return {
-            title: unescapeHtml(data.title || q),
-            extract: unescapeHtml(data.extract),
-            description: unescapeHtml(data.description || ""),
-            url: data.content_urls?.desktop?.page || `https://en.wikipedia.org/wiki/${encodeURIComponent(q)}`,
+            title: data.title,
+            extract: data.extract,
+            description: data.description || "",
+            url: data.content_urls?.desktop?.page || `https://en.wikipedia.org/wiki/${encodeURIComponent(data.title)}`,
           };
         }
       }
 
-      // 2. Wikipedia Search API fallback
       const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
         q
-      )}&utf8=&format=json`;
+      )}&format=json&origin=*`;
       const searchRes = await fetchWithTimeout(searchUrl, {
         "User-Agent": "OmniDashAI/1.0 (web-research-agent)",
-      }, 5000);
+      }, 4000);
 
       if (searchRes.ok) {
         const searchData = await searchRes.json();
-        const hits = searchData.query?.search || [];
-        for (const hit of hits.slice(0, 3)) {
-          const hitTitle = hit.title;
-          // Fetch summary for top hit
-          const hitSumUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(
-            hitTitle.replace(/\s+/g, "_")
+        const topHit = searchData.query?.search?.[0];
+        if (topHit?.title) {
+          const subUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(
+            topHit.title.replace(/\s+/g, "_")
           )}`;
-          try {
-            const hitSumRes = await fetchWithTimeout(hitSumUrl, {
-              "User-Agent": "OmniDashAI/1.0 (web-research-agent)",
-            }, 5000);
-            if (hitSumRes.ok) {
-              const hitSumData = await hitSumRes.json();
-              if (hitSumData.extract && hitSumData.extract.length > 80) {
-                return {
-                  title: unescapeHtml(hitSumData.title || hitTitle),
-                  extract: unescapeHtml(hitSumData.extract),
-                  description: unescapeHtml(hitSumData.description || ""),
-                  url:
-                    hitSumData.content_urls?.desktop?.page ||
-                    `https://en.wikipedia.org/wiki/${encodeURIComponent(hitTitle)}`,
-                };
-              }
-            }
-          } catch {}
+          const subRes = await fetchWithTimeout(subUrl, {
+            "User-Agent": "OmniDashAI/1.0 (web-research-agent)",
+          }, 4000);
+          if (subRes.ok) {
+            const data = await subRes.json();
+            return {
+              title: data.title,
+              extract: data.extract || "",
+              description: data.description || "",
+              url: data.content_urls?.desktop?.page || `https://en.wikipedia.org/wiki/${encodeURIComponent(data.title)}`,
+            };
+          }
         }
       }
-    } catch {
-      // Continue to next query candidate
-    }
+    } catch {}
   }
-
   return null;
 }
 
-async function fetchDuckDuckGoSnippets(
-  topic: string
-): Promise<Array<{ title: string; snippet: string; url: string }>> {
+async function fetchDuckDuckGoSnippets(query: string): Promise<Array<{ title: string; snippet: string; url: string }>> {
   try {
-    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(topic + " overview facts history")}`;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 6000);
-
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-      },
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-
+    const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+    const res = await fetchWithTimeout(url, { "User-Agent": "OmniDashAI/1.0" }, 4000);
     if (!res.ok) return [];
 
-    const html = await res.text();
+    const data = await res.json();
     const results: Array<{ title: string; snippet: string; url: string }> = [];
 
-    // Extract title, snippet, and url from DDG HTML
-    const linkRegex = /<a class="result__url[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
-    const snippetRegex = /<a class="result__snippet[^>]*>([\s\S]*?)<\/a>/g;
-    const titleRegex = /<a class="result__a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
-
-    const titles: string[] = [];
-    const urls: string[] = [];
-    const snippets: string[] = [];
-
-    let match;
-    while ((match = titleRegex.exec(html)) !== null && titles.length < 5) {
-      titles.push(unescapeHtml(match[2].replace(/<[^>]+>/g, "").trim()));
-    }
-    while ((match = snippetRegex.exec(html)) !== null && snippets.length < 5) {
-      snippets.push(unescapeHtml(match[1].replace(/<[^>]+>/g, "").trim()));
-    }
-    while ((match = linkRegex.exec(html)) !== null && urls.length < 5) {
-      let rawUrl = match[1];
-      if (rawUrl.startsWith("//")) {
-        rawUrl = "https:" + rawUrl;
-      }
-      const uddgMatch = rawUrl.match(/uddg=([^&]+)/);
-      if (uddgMatch && uddgMatch[1]) {
-        try {
-          rawUrl = decodeURIComponent(uddgMatch[1]);
-        } catch {}
-      }
-      urls.push(rawUrl);
-    }
-
-    for (let i = 0; i < snippets.length; i++) {
+    if (data.AbstractText) {
       results.push({
-        title: titles[i] || topic,
-        snippet: snippets[i],
-        url: urls[i] || "https://en.wikipedia.org",
+        title: data.Heading || query,
+        snippet: data.AbstractText,
+        url: data.AbstractURL || "",
       });
+    }
+
+    if (Array.isArray(data.RelatedTopics)) {
+      for (const topic of data.RelatedTopics.slice(0, 4)) {
+        if (topic.Text) {
+          results.push({
+            title: topic.Text.slice(0, 60),
+            snippet: topic.Text,
+            url: topic.FirstURL || "",
+          });
+        }
+      }
     }
 
     return results;
@@ -377,67 +542,58 @@ async function fetchDuckDuckGoSnippets(
 
 function categorizeFromDescription(description: string, summary: string): string {
   const text = `${description} ${summary}`.toLowerCase();
-  if (/festival|celebration|hindu|religion|ritual|deity|god|mytholog|chaviti|chaturthi|puja|pooja/i.test(text)) {
-    return "Cultural & Religious Festival";
+  if (/festival|celebration|observance|ritual|hindu festival|religious holiday|holiday|tradition/i.test(text)) {
+    return "Culture & Festival";
   }
-  if (/game|gaming|video game|rockstar|action-adventure|playstation|xbox|nintendo|esport/i.test(text)) {
-    return "Interactive Entertainment & Gaming";
+  if (/video game|action-adventure game|gameplay|role-playing game|nintendo|playstation|rockstar games|esport/i.test(text)) {
+    return "Gaming & Entertainment";
   }
-  if (/vitamin|nutrient|nutrition|retinol|carotenoid|rhodopsin|dietary|mineral|micronutrient|deficiency|health/i.test(text)) {
+  if (/vitamin|nutrient|organic compound|biochemistry|micronutrient|retinol|carotenoid|amino acid/i.test(text)) {
     return "Nutrition & Biochemistry";
   }
-  if (/history|revolution|empire|war|dynast|centur|civil war|republic|monarch|treaty|napoleon/i.test(text)) {
-    return "History & Civilization";
+  if (/quantum|qubit|superposition|quantum mechanics|decoherence/i.test(text)) {
+    return "Quantum Technology";
   }
-  if (/crop|plant|cultivat|farm|agricultur|botan|vegetable|fruit|harvest/i.test(text)) {
+  if (/crop|plant|species of|cereal|grain|agriculture|cultivation|farming|botanical/i.test(text)) {
     return "Agriculture & Cultivation";
   }
-  if (/quantum|qubit/i.test(text)) {
-    return "Quantum Computing & Physics";
-  }
-  if (/comput|software|algorithm|hardware|artificial intelligence|\btech\b|code|programming/i.test(text)) {
+  if (/software|programming|database|framework|computing|artificial intelligence/i.test(text)) {
     return "Technology & Computing";
   }
-  if (/physic|chemistr|biolog|\bgene\b|\bgenes\b|crispr|astronom|energi|space/i.test(text)) {
-    return "Science & Engineering";
+  if (/war|battle|empire|civilization|dynasty|treaty|historical event/i.test(text)) {
+    return "History & Civilization";
   }
-  if (/econom|financ|market|invest|trade|money|banking|crypto|stock/i.test(text)) {
-    return "Finance & Economics";
+  if (/company|corporation|financial|market|currency|stock/i.test(text)) {
+    return "Business & Finance";
   }
-  return description || "General Knowledge";
+  return "General Knowledge";
 }
 
 function inferCategory(topic: string, summary: string, snippets: string[]): string {
-  const combined = `${topic} ${summary} ${snippets.join(" ")}`.toLowerCase();
-  if (/festival|chaviti|ganesh|puja|pooja|hindu|deity|visarjan|temple|ritual|celebration/i.test(combined)) {
-    return "Cultural & Religious Festival";
+  const text = `${topic} ${summary} ${snippets.join(" ")}`.toLowerCase();
+  if (/festival|pooja|puja|chaviti|chaturthi|ganesh|diwali|holi|navratri|visarjan|ritual|celebration|observance/i.test(text)) {
+    return "Culture & Festival";
   }
-  if (/game|gaming|video game|rockstar|gta|action-adventure|playstation|xbox|nintendo|esport/i.test(combined)) {
-    return "Interactive Entertainment & Gaming";
+  if (/video game|gameplay|playstation|xbox|rockstar|action-adventure|gta|franchise|rpg|multiplayer|gaming/i.test(text)) {
+    return "Gaming & Entertainment";
   }
-  if (/vitamin|nutrient|nutrition|retinol|carotenoid|rhodopsin|dietary|mineral|micronutrient|deficiency/i.test(combined)) {
+  if (/vitamin|retinol|carotenoid|rhodopsin|nutrient|micronutrient|deficiency|supplement|bioavailability|dietary/i.test(text)) {
     return "Nutrition & Biochemistry";
   }
-  if (/history|revolution|empire|war|dynast|centur|civil war|republic|monarch|treaty|napoleon/i.test(combined)) {
-    return "History & Civilization";
+  if (/quantum|qubit|decoherence|superposition|nisq/i.test(text)) {
+    return "Quantum Technology";
   }
-  if (/cultivat|harvest|crop|seed|soil|farm|fertilizer|yield/i.test(combined)) {
+  if (/crop|soil|seed|harvest|fertilizer|irrigation|cultivat|yield|acre|pesticide/i.test(text)) {
     return "Agriculture & Cultivation";
   }
-  if (/quantum|qubit/i.test(combined)) {
-    return "Quantum Computing & Physics";
-  }
-  if (/comput|software|code|algorithm|ai|robot|network|cloud|developer/i.test(combined)) {
+  if (/software|algorithm|cloud|api|database|neural network|machine learning|framework|developer/i.test(text)) {
     return "Technology & Computing";
   }
-  if (/crispr|\bgene\b|\bgenes\b|dna|cell|disease|medic|health|patient|pharma/i.test(combined)) {
-    return "Medicine & Healthcare";
+  if (/war|battle|revolution|republic|empire|ancient|treaty/i.test(text)) {
+    return "History & Civilization";
   }
-  if (/energy|fusion|reactor|physic|space|planet|star|astronom/i.test(combined)) {
-    return "Science & Physics";
+  if (/stock|market|valuation|revenue|invest|gdp|crypto/i.test(text)) {
+    return "Business & Finance";
   }
-  if (/stock|option|invest|market|valuation|asset|fund|capital|crypto|finance/i.test(combined)) {
-    return "Finance & Economics";
-  }
-  return "Knowledge & Intelligence";
+  return "General Knowledge";
 }

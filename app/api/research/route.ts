@@ -39,7 +39,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const { apiKey, model, fallbackModels, tavilyApiKey } = getOpenRouterConfig();
+    const {
+      apiKey,
+      model,
+      fallbackModels,
+      tavilyApiKey,
+      braveApiKey,
+      firecrawlApiKey,
+      searchProvider,
+    } = getOpenRouterConfig();
 
     if (!apiKey) {
       return NextResponse.json(
@@ -48,8 +56,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Spawn 3 parallel live agents for fast multi-agent research with Tavily web grounding
-    const swarmResult = await executeResearchSwarm(trimmedTopic, fileText, { apiKey, model, fallbackModels, tavilyApiKey });
+    // Spawn 3 parallel live agents for fast multi-agent research with web grounding
+    const swarmResult = await executeResearchSwarm(trimmedTopic, fileText, {
+      apiKey,
+      model,
+      fallbackModels,
+      tavilyApiKey,
+      braveApiKey,
+      firecrawlApiKey,
+      searchProvider,
+    });
 
     const finalResearchJson = JSON.stringify(swarmResult.data);
 

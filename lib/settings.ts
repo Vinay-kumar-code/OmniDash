@@ -70,6 +70,33 @@ export function setTavilyApiKey(key: string): void {
   setSetting("tavily_api_key", key.trim());
 }
 
+export function getBraveApiKey(): string {
+  const dbKey = getSetting("brave_api_key");
+  return (dbKey || process.env.BRAVE_API_KEY || "").trim();
+}
+
+export function setBraveApiKey(key: string): void {
+  setSetting("brave_api_key", key.trim());
+}
+
+export function getFirecrawlApiKey(): string {
+  const dbKey = getSetting("firecrawl_api_key");
+  return (dbKey || process.env.FIRECRAWL_API_KEY || "").trim();
+}
+
+export function setFirecrawlApiKey(key: string): void {
+  setSetting("firecrawl_api_key", key.trim());
+}
+
+export function getSearchProviderPreference(): string {
+  const dbPref = getSetting("search_provider_preference");
+  return (dbPref || process.env.SEARCH_PROVIDER || "auto").trim();
+}
+
+export function setSearchProviderPreference(pref: string): void {
+  setSetting("search_provider_preference", pref.trim().toLowerCase());
+}
+
 export function getOpenRouterConfig() {
   const dbApiKey = getSetting("openrouter_api_key");
   const dbModel = getSetting("openrouter_model");
@@ -87,6 +114,17 @@ export function getOpenRouterConfig() {
 
   const fallbackModels = getFallbackModels();
   const tavilyApiKey = getTavilyApiKey();
+  const braveApiKey = getBraveApiKey();
+  const firecrawlApiKey = getFirecrawlApiKey();
+  const searchProvider = getSearchProviderPreference();
 
-  return { apiKey, model: resolvedModel, fallbackModels, tavilyApiKey };
+  return {
+    apiKey,
+    model: resolvedModel,
+    fallbackModels,
+    tavilyApiKey,
+    braveApiKey,
+    firecrawlApiKey,
+    searchProvider,
+  };
 }

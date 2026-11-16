@@ -1,31 +1,56 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOpenRouterConfig, setSetting, setFallbackModels, setTavilyApiKey } from "@/lib/settings";
+import {
+  getOpenRouterConfig,
+  setSetting,
+  setFallbackModels,
+  setTavilyApiKey,
+  setBraveApiKey,
+  setFirecrawlApiKey,
+  setSearchProviderPreference,
+} from "@/lib/settings";
 
 export async function GET() {
   try {
-    const { apiKey, model, fallbackModels, tavilyApiKey } = getOpenRouterConfig();
-    const isApiKeySet = Boolean(apiKey && apiKey.length > 5);
+    const {
+      apiKey,
+      model,
+      fallbackModels,
+      tavilyApiKey,
+      braveApiKey,
+      firecrawlApiKey,
+      searchProvider,
+    } = getOpenRouterConfig();
 
-    let apiKeyMasked = "";
-    if (isApiKeySet) {
-      const prefix = apiKey.substring(0, 8);
-      const suffix = apiKey.slice(-4);
-      apiKeyMasked = `${prefix}••••••••${suffix}`;
-    }
+    const isApiKeySet = Boolean(apiKey && apiKey.length > 5);
+    const apiKeyMasked = isApiKeySet
+      ? `${apiKey.substring(0, 8)}••••••••${apiKey.slice(-4)}`
+      : "";
 
     const isTavilyKeySet = Boolean(tavilyApiKey && tavilyApiKey.length > 5);
-    let tavilyKeyMasked = "";
-    if (isTavilyKeySet) {
-      const prefix = tavilyApiKey.substring(0, 6);
-      const suffix = tavilyApiKey.slice(-4);
-      tavilyKeyMasked = `${prefix}••••••••${suffix}`;
-    }
+    const tavilyKeyMasked = isTavilyKeySet
+      ? `${tavilyApiKey.substring(0, 6)}••••••••${tavilyApiKey.slice(-4)}`
+      : "";
+
+    const isBraveKeySet = Boolean(braveApiKey && braveApiKey.length > 5);
+    const braveKeyMasked = isBraveKeySet
+      ? `${braveApiKey.substring(0, 6)}••••••••${braveApiKey.slice(-4)}`
+      : "";
+
+    const isFirecrawlKeySet = Boolean(firecrawlApiKey && firecrawlApiKey.length > 5);
+    const firecrawlKeyMasked = isFirecrawlKeySet
+      ? `${firecrawlApiKey.substring(0, 6)}••••••••${firecrawlApiKey.slice(-4)}`
+      : "";
 
     return NextResponse.json({
       isApiKeySet,
       apiKeyMasked,
       isTavilyKeySet,
       tavilyKeyMasked,
+      isBraveKeySet,
+      braveKeyMasked,
+      isFirecrawlKeySet,
+      firecrawlKeyMasked,
+      searchProvider,
       model,
       fallbackModels,
     });
@@ -37,7 +62,15 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { apiKey, model, fallbackModels, tavilyApiKey } = await req.json();
+    const {
+      apiKey,
+      model,
+      fallbackModels,
+      tavilyApiKey,
+      braveApiKey,
+      firecrawlApiKey,
+      searchProvider,
+    } = await req.json();
 
     if (apiKey !== undefined && apiKey !== null) {
       const trimmed = apiKey.trim();
@@ -62,7 +95,22 @@ export async function POST(req: NextRequest) {
       setTavilyApiKey(trimmedTavily);
     }
 
+    if (braveApiKey !== undefined && braveApiKey !== null) {
+      const trimmedBrave = braveApiKey.trim();
+      setBraveApiKey(trimmedBrave);
+    }
+
+    if (firecrawlApiKey !== undefined && firecrawlApiKey !== null) {
+      const trimmedFirecrawl = firecrawlApiKey.trim();
+      setFirecrawlApiKey(trimmedFirecrawl);
+    }
+
+    if (searchProvider !== undefined && searchProvider !== null) {
+      setSearchProviderPreference(searchProvider);
+    }
+
     const updated = getOpenRouterConfig();
+
     const isApiKeySet = Boolean(updated.apiKey && updated.apiKey.length > 5);
     const apiKeyMasked = isApiKeySet
       ? `${updated.apiKey.substring(0, 8)}••••••••${updated.apiKey.slice(-4)}`
@@ -73,12 +121,27 @@ export async function POST(req: NextRequest) {
       ? `${updated.tavilyApiKey.substring(0, 6)}••••••••${updated.tavilyApiKey.slice(-4)}`
       : "";
 
+    const isBraveKeySet = Boolean(updated.braveApiKey && updated.braveApiKey.length > 5);
+    const braveKeyMasked = isBraveKeySet
+      ? `${updated.braveApiKey.substring(0, 6)}••••••••${updated.braveApiKey.slice(-4)}`
+      : "";
+
+    const isFirecrawlKeySet = Boolean(updated.firecrawlApiKey && updated.firecrawlApiKey.length > 5);
+    const firecrawlKeyMasked = isFirecrawlKeySet
+      ? `${updated.firecrawlApiKey.substring(0, 6)}••••••••${updated.firecrawlApiKey.slice(-4)}`
+      : "";
+
     return NextResponse.json({
       success: true,
       isApiKeySet,
       apiKeyMasked,
       isTavilyKeySet,
       tavilyKeyMasked,
+      isBraveKeySet,
+      braveKeyMasked,
+      isFirecrawlKeySet,
+      firecrawlKeyMasked,
+      searchProvider: updated.searchProvider,
       model: updated.model,
       fallbackModels: updated.fallbackModels,
     });

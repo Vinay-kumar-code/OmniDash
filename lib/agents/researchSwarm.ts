@@ -92,7 +92,7 @@ export interface SwarmResult {
     agent3_strategy: boolean;
   };
   durationMs: number;
-  engineUsed?: "tavily" | "wikipedia_ddg";
+  engineUsed?: "tavily" | "brave" | "firecrawl" | "wikipedia_ddg";
 }
 
 /**
@@ -986,7 +986,15 @@ export function getFallbackStrategy(topic: string, web?: WebResearchResult): Str
 export async function executeResearchSwarm(
   topic: string,
   contextText: string,
-  config: { apiKey: string; model: string; fallbackModels?: string[]; tavilyApiKey?: string }
+  config: {
+    apiKey: string;
+    model: string;
+    fallbackModels?: string[];
+    tavilyApiKey?: string;
+    braveApiKey?: string;
+    firecrawlApiKey?: string;
+    searchProvider?: string;
+  }
 ): Promise<SwarmResult> {
   const startTime = Date.now();
   const trimmedTopic = topic.trim();
@@ -995,7 +1003,12 @@ export async function executeResearchSwarm(
   console.log(`[ResearchSwarm] Step 1: Launching Live Web Research Agent for "${trimmedTopic}"`);
   let webResearch: WebResearchResult;
   try {
-    webResearch = await searchWebForTopic(trimmedTopic, config.tavilyApiKey);
+    webResearch = await searchWebForTopic(trimmedTopic, {
+      tavilyApiKey: config.tavilyApiKey,
+      braveApiKey: config.braveApiKey,
+      firecrawlApiKey: config.firecrawlApiKey,
+      searchProvider: config.searchProvider,
+    });
     console.log(
       `[ResearchSwarm] Web research resolved: "${webResearch.title}" | Category: ${webResearch.detectedCategory} | Engine: ${webResearch.engineUsed || "unknown"} | Sources: ${webResearch.sources.length}`
     );
